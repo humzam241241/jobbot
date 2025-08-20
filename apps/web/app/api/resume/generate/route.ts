@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { htmlToPdfBuffer } from "@/lib/pdf/renderPdf";
+import { renderPdf } from "@/lib/pdf/renderPdf";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { generateAny } from "@/lib/ai";
@@ -510,9 +510,21 @@ Include a visual representation of the match score.
     const jobId = `gen_${Date.now()}`;
     
     // Generate actual PDF buffers
-    const resumePdfBuffer = await htmlToPdfBuffer(resumeHtml, { title: "Tailored Resume", size: "Letter" });
-    const coverLetterPdfBuffer = await htmlToPdfBuffer(coverLetterHtml, { title: "Cover Letter", size: "Letter" });
-    const atsReportPdfBuffer = await htmlToPdfBuffer(atsReportHtml, { title: "ATS Report", size: "Letter" });
+    const resumePdfBuffer = await renderPdf(resumeHtml, { 
+      title: "Tailored Resume", 
+      size: "Letter",
+      engine: "puppeteer"
+    });
+    const coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
+      title: "Cover Letter", 
+      size: "Letter",
+      engine: "puppeteer"
+    });
+    const atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
+      title: "ATS Report", 
+      size: "Letter",
+      engine: "puppeteer"
+    });
     
     return NextResponse.json({
       ok: true,

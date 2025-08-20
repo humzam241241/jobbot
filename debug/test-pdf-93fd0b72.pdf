@@ -1,0 +1,9 @@
+PDF generation failed: browserType.launch: Executable doesn't exist at C:\Users\humza\AppData\Local\ms-playwright\chromium_headless_shell-1187\chrome-win\headless_shell.exe
+╔═════════════════════════════════════════════════════════════════════════╗
+║ Looks like Playwright Test or Playwright was just installed or updated. ║
+║ Please run the following command to download new browsers:              ║
+║                                                                         ║
+║     pnpm exec playwright install                                        ║
+║                                                                         ║
+║ <3 Playwright Team                                                      ║
+╚═════════════════════════════════════════════════════════════════════════╝

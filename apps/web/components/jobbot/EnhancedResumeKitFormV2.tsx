@@ -8,6 +8,61 @@ import JobDescriptionFallback from '@/components/JobDescriptionFallback';
 import { useResumeGeneration } from '@/hooks/useResumeGeneration';
 import { formatErrorMessage, getErrorSuggestion, getErrorTrackingInfo } from '@/lib/errorHandling';
 
+// Helper functions for model selection
+type ModelOption = { value: string; label: string };
+
+function getDefaultModel(provider: string): string {
+  switch (provider) {
+    case 'openai': return 'gpt-4o-2024-05-13';
+    case 'anthropic': return 'claude-3-5-sonnet';
+    case 'gemini': return 'gemini-2.5-pro';
+    case 'openrouter': return 'gpt-4o-2024-05-13';
+    default: return 'auto';
+  }
+}
+
+function getModelOptions(provider: string): ModelOption[] {
+  switch (provider) {
+    case 'openai':
+      return [
+        { value: 'gpt-4o-2024-05-13', label: 'GPT-4o (May 2024)' },
+        { value: 'gpt-4o', label: 'GPT-4o' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+        { value: 'gpt-4-vision-preview', label: 'GPT-4 Vision' },
+        { value: 'gpt-4', label: 'GPT-4' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }
+      ];
+    case 'anthropic':
+      return [
+        { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+        { value: 'claude-3-opus', label: 'Claude 3 Opus' },
+        { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
+        { value: 'claude-3-haiku', label: 'Claude 3 Haiku' },
+        { value: 'claude-2', label: 'Claude 2' }
+      ];
+    case 'gemini':
+      return [
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+        { value: 'gemini-1.0-pro', label: 'Gemini 1.0 Pro' }
+      ];
+    case 'openrouter':
+      return [
+        { value: 'gpt-4o-2024-05-13', label: 'GPT-4o (May 2024)' },
+        { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+        { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' },
+        { value: 'mistral/mistral-large-2', label: 'Mistral Large 2' },
+        { value: 'meta-llama/llama-3-70b-instruct', label: 'Llama 3 70B' },
+        { value: 'google/gemini-1.5-pro', label: 'Gemini 1.5 Pro' }
+      ];
+    default:
+      return [];
+  }
+}
+
 type Kit = {
   kitId: string;
   providerUsedResume: string;
@@ -60,7 +115,7 @@ export default function EnhancedResumeKitFormV2() {
   const [notes, setNotes] = useState('');
   const [provider, setProvider] = useState('auto');
   const [model, setModel] = useState('');
-  const [showJobDescription, setShowJobDescription] = useState(true);
+  const [showJobDescription, setShowJobDescription] = useState(true); // Always show by default
   const [generationCount, setGenerationCount] = useLocalStorage<number>('jobbot-generation-count', 0);
   const [activeStep, setActiveStep] = useState(0);
   const [steps, setSteps] = useState<GenerationStep[]>(GENERATION_STEPS);
@@ -206,38 +261,41 @@ export default function EnhancedResumeKitFormV2() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {!tempKit ? (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
           {/* Resume Upload */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Upload Your Resume</label>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium flex items-center gap-1">
+              <span>Upload Your Resume</span>
+              <span className="text-red-500">*</span>
+            </label>
             <div 
               {...getRootProps()} 
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
-                isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
+                isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
               <input {...getInputProps()} />
               {resumeFile ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <DocumentTextIcon className="h-5 w-5 text-blue-500" />
-                  <span className="text-sm">{resumeFile.name}</span>
+                <div className="flex items-center justify-center space-x-3">
+                  <DocumentTextIcon className="h-6 w-6 text-blue-500" />
+                  <span className="text-sm font-medium">{resumeFile.name}</span>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setResumeFile(null);
                     }}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 rounded-full p-1 hover:bg-red-50 transition-colors"
                   >
                     <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <DocumentArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="text-sm text-gray-600">
+                <div className="space-y-3">
+                  <DocumentArrowUpIcon className="mx-auto h-14 w-14 text-gray-400" />
+                  <p className="text-sm text-gray-600 font-medium">
                     {isDragActive
                       ? "Drop your resume here..."
                       : "Drag and drop your resume, or click to select"}
@@ -249,32 +307,54 @@ export default function EnhancedResumeKitFormV2() {
           </div>
 
           {/* Job URL */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label htmlFor="jobUrl" className="block text-sm font-medium">
-              Job Posting URL (Optional)
+              Job Posting URL <span className="text-gray-500 text-xs">(Optional)</span>
             </label>
-            <input
-              type="text"
-              id="jobUrl"
-              value={jobUrl}
-              onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://example.com/job-posting"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                id="jobUrl"
+                value={jobUrl}
+                onChange={(e) => setJobUrl(e.target.value)}
+                placeholder="https://example.com/job-posting"
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* Job Description */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label htmlFor="jobDescription" className="block text-sm font-medium">
-                Job Description
+              <label htmlFor="jobDescription" className="block text-sm font-medium flex items-center gap-2">
+                Job Description 
+                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-medium">Recommended</span>
               </label>
               <button
                 type="button"
                 onClick={() => setShowJobDescription(!showJobDescription)}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
               >
-                {showJobDescription ? "Hide" : "Show"}
+                {showJobDescription ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                    Show
+                  </>
+                )}
               </button>
             </div>
             {showJobDescription && (
@@ -283,9 +363,9 @@ export default function EnhancedResumeKitFormV2() {
                   id="jobDescription"
                   value={jdText}
                   onChange={(e) => setJdText(e.target.value)}
-                  placeholder="Paste the job description here..."
+                  placeholder="Paste the job description here for better tailoring..."
                   rows={6}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 />
                 {!jdText && <JobDescriptionFallback />}
               </>
@@ -293,95 +373,154 @@ export default function EnhancedResumeKitFormV2() {
           </div>
 
           {/* Notes */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label htmlFor="notes" className="block text-sm font-medium">
-              Additional Notes (Optional)
+              Additional Notes <span className="text-gray-500 text-xs">(Optional)</span>
             </label>
-            <textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any specific instructions or information..."
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* AI Provider Selection */}
-          <div className="space-y-2">
-            <label htmlFor="provider" className="block text-sm font-medium">
-              AI Provider
-            </label>
-            <select
-              id="provider"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="auto">Auto (Recommended)</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="openrouter">OpenRouter</option>
-            </select>
-          </div>
-
-          {/* Model Selection (conditionally shown) */}
-          {provider !== 'auto' && (
-            <div className="space-y-2">
-              <label htmlFor="model" className="block text-sm font-medium">
-                Model (Optional)
-              </label>
-              <input
-                type="text"
-                id="model"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder={`Enter specific ${provider} model name`}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            <div className="relative">
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any specific instructions or information..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               />
-              <p className="text-xs text-gray-500">
-                Leave blank to use the default model for the selected provider
-              </p>
+              {notes && (
+                <button
+                  type="button"
+                  onClick={() => setNotes('')}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 rounded-full p-1 hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
             </div>
-          )}
+          </div>
+
+          {/* AI Provider and Model Selection (side by side) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="provider" className="text-sm font-medium">
+                AI Settings
+              </label>
+              {provider !== 'auto' && (
+                <span className="text-xs text-blue-600 font-medium flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Default model: {getDefaultModel(provider)}
+                </span>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* AI Provider */}
+              <div className="relative">
+                <select
+                  id="provider"
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-colors"
+                >
+                  <option value="auto">Auto (Recommended)</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openrouter">OpenRouter</option>
+                </select>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Model Selection */}
+              <div className={`relative ${provider === 'auto' ? 'opacity-50' : ''}`}>
+                <select
+                  id="model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={provider === 'auto'}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-colors disabled:bg-gray-100"
+                >
+                  <option value="">Default Model</option>
+                  {getModelOptions(provider).map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </div>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Generation Count */}
           {generationCount !== null && generationCount > 0 && (
-            <div className="text-xs text-gray-500 text-right">
+            <div className="text-xs text-gray-500 text-right flex items-center justify-end gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
               You've generated {generationCount} resume kit{generationCount !== 1 ? 's' : ''}
             </div>
           )}
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm">
-              <div className="font-medium text-red-800">{formatErrorMessage(error)}</div>
-              <div className="mt-1 text-red-700">{getErrorSuggestion(error)}</div>
-              <div className="mt-2 text-xs text-gray-500">{getErrorTrackingInfo(error)}</div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm shadow-sm">
+              <div className="font-medium text-red-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {formatErrorMessage(error)}
+              </div>
+              <div className="mt-2 text-red-700">{getErrorSuggestion(error)}</div>
+              <div className="mt-2 text-xs text-gray-500 font-mono">{getErrorTrackingInfo(error)}</div>
             </div>
           )}
 
           {/* Submit Button */}
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-4 pt-2">
             <button
               type="button"
               onClick={handleReset}
               disabled={isLoading}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-5 py-2.5 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               Reset
             </button>
             <button
               type="submit"
               disabled={isLoading || !resumeFile}
-              className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+              className={`px-5 py-2.5 rounded-lg shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                 isLoading || !resumeFile
                   ? 'bg-blue-300 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
               }`}
             >
-              {isLoading ? 'Generating...' : 'Generate Resume Kit'}
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Generating...
+                </span>
+              ) : 'Generate Resume Kit'}
             </button>
           </div>
 

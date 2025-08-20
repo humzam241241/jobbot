@@ -1,6 +1,7 @@
 import { chromium, Browser } from "playwright";
 import { wrapForPrint } from "./sanitize";
 import { createLogger } from "@/lib/logger";
+import { puppeteerHtmlToPdf, generateSimplePdf } from "./puppeteerRenderer";
 
 const logger = createLogger('pdf-renderer');
 
@@ -35,7 +36,18 @@ async function playwrightHtmlToPdf(
   opts?: { title?: string; size?: "Letter"|"A4" }
 ): Promise<Buffer> {
   try {
-    const browser = await getBrowser();
+    logger.debug('Starting Playwright PDF generation');
+    
+    // Launch a new browser instance directly instead of using the singleton
+    // This helps avoid issues with the shared browser instance
+    const browser = await chromium.launch({ 
+      headless: true, 
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      timeout: 60000, // Longer timeout for browser launch
+    });
+    
+    logger.debug('Browser launched successfully');
+    
     const context = await browser.newContext(); // ephemeral for isolation
     const page = await context.newPage();
     
@@ -45,8 +57,11 @@ async function playwrightHtmlToPdf(
       size: opts?.size || "Letter" 
     });
     
+    logger.debug('HTML wrapped for printing, content length: ' + wrappedHtml.length);
+    
     // Set content and wait for load
     await page.setContent(wrappedHtml, { waitUntil: "load" });
+    logger.debug('Content loaded in page');
     
     // Generate PDF
     const pdf = await page.pdf({
@@ -62,8 +77,13 @@ async function playwrightHtmlToPdf(
       scale: 1.0,
     });
     
+    logger.debug(`PDF generated, size: ${pdf.byteLength} bytes`);
+    
     // Clean up
     await context.close();
+    await browser.close();
+    
+    logger.debug('Browser closed');
     
     return Buffer.from(pdf);
   } catch (error) {
@@ -88,40 +108,49 @@ export async function renderPdf(
   if (!html || typeof html !== 'string') {
     logger.error('Invalid HTML provided to renderPdf', { type: typeof html });
     const fallbackHtml = '<html><body><h1>Document</h1><p>Content could not be rendered.</p></body></html>';
-    return Buffer.from(fallbackHtml);
+    return generateSimplePdf('Content could not be rendered.', options.title || 'Document');
   }
   
   try {
-    // Determine rendering engine
-    const engine = options.engine || 'playwright';
+    // Default to puppeteer for reliability
+    const engine = options.engine || 'puppeteer';
     logger.info(`Rendering PDF using ${engine} engine`);
     
     // Use appropriate engine
     switch (engine) {
       case 'playwright':
-        return await playwrightHtmlToPdf(html, options);
+        try {
+          return await playwrightHtmlToPdf(html, options);
+        } catch (playwrightError) {
+          logger.warn('Playwright PDF generation failed, falling back to Puppeteer', { error: playwrightError });
+          return await puppeteerHtmlToPdf(html, options);
+        }
       
       case 'puppeteer':
-        // For now, just use Playwright
-        // In the future, this could be implemented with Puppeteer
-        return await playwrightHtmlToPdf(html, options);
+        return await puppeteerHtmlToPdf(html, options);
       
       default:
-        logger.warn(`Unknown PDF engine: ${engine}, falling back to Playwright`);
-        return await playwrightHtmlToPdf(html, options);
+        logger.warn(`Unknown PDF engine: ${engine}, falling back to Puppeteer`);
+        return await puppeteerHtmlToPdf(html, options);
     }
   } catch (error) {
-    logger.error('PDF rendering failed', { error });
+    logger.error('PDF rendering failed with all engines', { error });
     
-    // Return fallback HTML as buffer
-    return Buffer.from(`
-      <html>
-        <body>
-          <h1>${options.title || "Document"}</h1>
-          <div>${html}</div>
-        </body>
-      </html>
-    `);
+    try {
+      // Create a simple error PDF
+      return await generateSimplePdf(
+        `There was an error rendering the PDF. Please try again or contact support if the issue persists.\n\nError details: ${error.message}`, 
+        `${options.title || "Document"} (Error)`
+      );
+    } catch (fallbackError) {
+      logger.error('All PDF generation methods failed', { 
+        originalError: error,
+        fallbackError 
+      });
+      
+      // Last resort: return a text buffer with error info
+      return Buffer.from(`PDF generation failed: ${error.message}`);
+    }
   }
 }
 

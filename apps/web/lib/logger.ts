@@ -99,6 +99,33 @@ const storeErrorLog = (level: string, message: string, details?: any, stack?: st
   return id;
 };
 
+// Client-side safe logger fallback
+export const clientLogger = {
+  debug: (message: string, details?: any) => {
+    console.debug(`[DEBUG] ${message}`, details ? redactSensitiveInfo(details) : '');
+    return generateTraceId();
+  },
+  info: (message: string, details?: any) => {
+    console.info(`[INFO] ${message}`, details ? redactSensitiveInfo(details) : '');
+    return generateTraceId();
+  },
+  warn: (message: string, details?: any) => {
+    console.warn(`[WARN] ${message}`, details ? redactSensitiveInfo(details) : '');
+    return generateTraceId();
+  },
+  error: (message: string, details?: any, error?: Error) => {
+    console.error(`[ERROR] ${message}`, details ? redactSensitiveInfo(details) : '', error || '');
+    return generateTraceId();
+  },
+  critical: (message: string, details?: any, error?: Error) => {
+    console.error(`[CRITICAL] ${message}`, details ? redactSensitiveInfo(details) : '', error || '');
+    return generateTraceId();
+  },
+  getLastErrors: () => {
+    return [];
+  }
+};
+
 export const logger = {
   debug: (message: string, details?: any) => {
     console.debug(`[DEBUG] ${message}`, details ? redactSensitiveInfo(details) : '');
@@ -138,5 +165,26 @@ export const logger = {
     return errorLogs;
   }
 };
+
+// Factory function to create a logger with a specific context
+export function createLogger(context: string) {
+  return {
+    debug: (message: string, details?: any) => {
+      return logger.debug(`[${context}] ${message}`, details);
+    },
+    info: (message: string, details?: any) => {
+      return logger.info(`[${context}] ${message}`, details);
+    },
+    warn: (message: string, details?: any) => {
+      return logger.warn(`[${context}] ${message}`, details);
+    },
+    error: (message: string, details?: any, error?: Error) => {
+      return logger.error(`[${context}] ${message}`, details, error);
+    },
+    critical: (message: string, details?: any, error?: Error) => {
+      return logger.critical(`[${context}] ${message}`, details, error);
+    }
+  };
+}
 
 export default logger;
