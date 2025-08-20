@@ -24,7 +24,7 @@ if not errorlevel 1 (
 REM Use Node 18 if available
 where nvm >NUL 2>&1
 if not errorlevel 1 (
-    echo Switching to Node 18.20.3 via nvm (if installed)...
+    echo Switching to Node 18.20.3 via nvm ^(if installed^)...
     nvm use 18.20.3 >NUL 2>&1
 )
 
