@@ -1,0 +1,276 @@
+// Datasource
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+}
+enum JobSource {
+  URL
+  SEARCH
+}
+enum BaseResumeType {
+  GENERAL
+  MECHANICAL
+  SWE
+  CUSTOM
+}
+enum ModelRoute {
+  DRAFT
+  POLISH
+}
+enum ApplicationStatus {
+  APPLIED
+  SCREEN
+  INTERVIEW
+  OFFER
+  REJECTED
+}
+enum OutreachStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  FOLLOW_UP
+  CLOSED
+}
+enum AuthEvent {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
+  SIGNUP
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_SUCCESS
+}
+
+// Models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // New fields for robust auth and admin dashboard
+  role          String    @default("user") // "user" or "admin"
+  passwordHash  String?   // For email/password login
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  authLogs      AuthLog[]
+  generations   Generation[]
+  documents     Document[]
+  applications  Application[]
+  
+  // Additional relations
+  jobs          Job[]
+  resumes       Resume[]
+  coverLetters  CoverLetter[]
+  connections   Connection[]
+  portfolioItems PortfolioItem[]
+  events        Event[]
+}
+
+model AuthLog {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     AuthEvent
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+}
+
+model Job {
+  id           String     @id @default(cuid())
+  user         User       @relation(fields: [userId], references: [id])
+  userId       String
+  source       JobSource
+  url          String
+  canonicalUrl String?
+  title        String?
+  company      String?
+  location     String?
+  salary       String?
+  jdText       String
+  jdHash       String
+  tags         String[]   @default([])
+  createdAt    DateTime   @default(now())
+
+  resumeVersions ResumeVersion[]
+  coverLetters   CoverLetter[]
+  connections    Connection[]
+
+  @@index([jdHash])
+}
+
+model Resume {
+  id            String         @id @default(cuid())
+  user          User           @relation(fields: [userId], references: [id])
+  userId        String
+  title         String
+  baseType      BaseResumeType
+  contentMd     String
+  formatVersion Int            @default(1)
+  tags          String[]       @default([])
+  createdAt     DateTime       @default(now())
+
+  versions      ResumeVersion[]
+}
+
+model ResumeVersion {
+  id          String     @id @default(cuid())
+  resume      Resume     @relation(fields: [resumeId], references: [id])
+  resumeId    String
+  job         Job?       @relation(fields: [jobId], references: [id])
+  jobId       String?
+  contentMd   String
+  atsScore    Int        @default(0)
+  fixesJson   Json?
+  modelRoute  ModelRoute
+  createdAt   DateTime   @default(now())
+  
+  coverLetters CoverLetter[]
+}
+
+model CoverLetter {
+  id               String        @id @default(cuid())
+  user             User          @relation(fields: [userId], references: [id])
+  userId           String
+  job              Job           @relation(fields: [jobId], references: [id])
+  jobId            String
+  resumeVersion    ResumeVersion @relation(fields: [resumeVersionId], references: [id])
+  resumeVersionId  String
+  contentMd        String
+  createdAt        DateTime      @default(now())
+}
+
+model Application {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobTitle   String
+  company    String
+  sourceUrl  String?
+  status     String   // e.g., "applied", "interviewing", "tracking"
+  sourceType String?  // 'library' | 'file'
+  sourceId   String?  // id from library/file
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Connection {
+  id             String          @id @default(cuid())
+  user           User            @relation(fields: [userId], references: [id])
+  userId         String
+  job            Job?            @relation(fields: [jobId], references: [id])
+  jobId          String?
+  name           String
+  title          String?
+  company        String?
+  profileUrl     String?
+  outreachStatus OutreachStatus  @default(NEW)
+  lastContactAt  DateTime?
+}
+
+model PortfolioItem {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  title     String
+  summary   String
+  bullets   String[] @default([])
+  links     String[] @default([])
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  type      String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Cache {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  ttl   Int
+}
+
+// NextAuth tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// New models for the comprehensive upgrade
+
+model Generation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String
+  model       String?
+  status      String   // e.g., "completed", "failed"
+  durationMs  Int
+  atsScore    Float?
+  errorCode   String?
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "master", "tailored_resume", "cover_letter"
+  url       String?  // Could be a signed S3 URL in production
+  bytes     Int?
+  createdAt DateTime @default(now())
+}
+
+

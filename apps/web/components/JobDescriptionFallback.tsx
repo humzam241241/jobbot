@@ -4,10 +4,11 @@ type Props = {
   onSubmit: (jdText: string) => Promise<void> | void;
   onDismiss?: () => void;
   asModal?: boolean; // if you want to render it modal-style
+  initialText?: string; // Allow passing initial text
 };
 
-export default function JobDescriptionFallback({ onSubmit, onDismiss, asModal }: Props) {
-  const [text, setText] = useState('');
+export default function JobDescriptionFallback({ onSubmit, onDismiss, asModal, initialText = '' }: Props) {
+  const [text, setText] = useState(initialText);
   const [busy, setBusy] = useState(false);
 
   const handleUsePaste = async () => {
@@ -20,7 +21,7 @@ export default function JobDescriptionFallback({ onSubmit, onDismiss, asModal }:
     <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-3 max-w-2xl">
       <p className="text-sm text-red-800 font-medium">
         This site blocked automated extraction (e.g., LinkedIn).
-        Paste the full job description below and we’ll continue normally.
+        Paste the full job description below and we'll continue normally.
       </p>
       <textarea
         className="w-full min-h-[180px] rounded-md border p-3 text-sm"
@@ -43,7 +44,7 @@ export default function JobDescriptionFallback({ onSubmit, onDismiss, asModal }:
         )}
       </div>
       <p className="text-xs text-gray-600">
-        Tip: Copy from the page’s “Full job description”. Your text will be used to generate your kit.
+        Tip: Copy from the page's "Full job description". Your text will be used to generate your kit.
       </p>
     </div>
   );

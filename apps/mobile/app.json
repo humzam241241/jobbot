@@ -1,16 +1,39 @@
 {
   "expo": {
-    "name": "ResumeGen",
-    "slug": "resume-gen",
+    "name": "Job Bot",
+    "slug": "job-bot",
+    "scheme": "jobbot",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "resumegen",
-    "platforms": [
-      "ios",
-      "android"
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
     ],
+    "ios": {
+      "supportsTablet": true,
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
-      "apiUrl": "http://localhost:8787"
-    }
+      "EXPO_PUBLIC_API_URL": "http://localhost:8787"
+    },
+    "owner": ""
   }
 }

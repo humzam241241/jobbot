@@ -4,17 +4,31 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "node scripts/start.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
-    "expo": "~51.0.22",
-    "expo-document-picker": "~12.0.1",
-    "expo-file-system": "~17.0.1",
+    "expo": "~51.0.18",
+    "expo-apple-authentication": "6.4.1",
+    "expo-application": "~5.9.1",
+    "expo-auth-session": "~5.5.2",
     "expo-constants": "~16.0.2",
+    "expo-document-picker": "~12.0.2",
+    "expo-file-system": "~17.0.1",
+    "expo-linking": "~6.3.1",
+    "expo-secure-store": "~13.0.2",
+    "expo-web-browser": "~13.0.3",
     "react": "18.2.0",
-    "react-native": "0.74.3"
+    "react-native": "0.74.3",
+    "react-native-gesture-handler": "2.16.2",
+    "react-native-paper": "5.12.5",
+    "react-native-reanimated": "3.10.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-view-shot": "3.8.0"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.79",
+    "@types/react-native": "~0.73.0"
   }
 }

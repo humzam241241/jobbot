@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '../styles/theme.css';
+
+:root {
+  --background: 222 47% 6%;      /* deep navy bg */
+  --foreground: 210 40% 98%;
+  --card: 222 47% 9%;
+  --muted: 215 20% 20%;
+  --muted-foreground: 215 16% 70%;
+  --border: 215 20% 22%;
+  --ring: 212 100% 47%;
+
+  --primary: 212 100% 47%;        /* brand blue */
+  --primary-foreground: 210 40% 98%;
+}
+
+.dark {
+  /* same as :root for now; keep hook for future light mode */
+}
+
+/* Optional global dark base for Apple-y look */
+:root { color-scheme: dark; }
+html, body { min-height:100%; }
+body { color: rgb(243 244 246); background: #0a0c10; }
+

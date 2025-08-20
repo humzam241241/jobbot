@@ -1,105 +1,120 @@
-# Resume SaaS Starter (Mobile + API)
+# JobBot - AI-Powered Resume Tailoring and Job Application Assistant
 
-This is a **production-minded prototype** for your cross-platform app:
-- **Mobile**: Expo (iOS & Android) for file upload and job URL input
-- **API Server**: Node + Express (TypeScript). Parses resumes (.pdf, .docx, .txt), fetches job description from a URL, calls a **low-cost/free AI** (DeepSeek/OpenRouter/HuggingFace), and returns **1-page optimized Resume + Cover Letter** as downloadable PDFs.
+JobBot is a full-stack application that helps job seekers optimize their resumes and cover letters for specific job postings using AI. The application analyzes both the user's resume and the target job description to create tailored, ATS-optimized documents.
 
-> Designed to slot into a broader master SaaS. Uses a clean provider pattern for AI and statically serves generated PDFs.
+## Features
 
----
+- **Resume Tailoring**: Upload your resume and job description to generate a tailored, ATS-optimized resume
+- **Cover Letter Generation**: Automatically create personalized cover letters based on your resume and job description
+- **ATS Compatibility Reports**: Get insights on how well your resume matches the job requirements
+- **File Management**: Organize and track your generated documents
+- **Job Application Tracking**: Keep track of your job applications
+- **Multiple AI Providers**: Support for OpenAI, Anthropic, and Google AI models
 
-## Prereqs (install these)
-- **Node.js 20+**
-- **pnpm** (`npm i -g pnpm`)
-- **Expo** (for mobile): `npm i -g expo` (or use `npx expo`)
-- For iOS: Xcode (on macOS) or the **Expo Go** app on your iPhone
-- For Android: Android Studio emulator or the **Expo Go** app on Android
+## Tech Stack
 
-> No native deps like Poppler/Tesseract required. PDF text extraction uses `pdf-parse` (pure JS).
+- **Frontend**: Next.js (App Router), React, Tailwind CSS
+- **Backend**: Next.js API Routes, Zod for validation
+- **Authentication**: NextAuth.js with Google OAuth
+- **Database**: PostgreSQL with Prisma ORM
+- **PDF Generation**: Playwright for HTML to PDF conversion
+- **AI Integration**: Multiple provider adapters (OpenAI, Anthropic, Google)
+- **Testing**: Vitest for unit and integration tests
 
----
+## Prerequisites
+
+- **Node.js**: v18.20.3 or later (check `.nvmrc`)
+- **PNPM**: v9.7.0 or later (package manager)
+- **PostgreSQL**: For user data and application tracking
 
 ## Quickstart
 
-```bash
-pnpm install
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/resume-bot.git
+   cd resume-bot
+   ```
 
-# 1) Start API
-cp apps/server/.env.example apps/server/.env
-pnpm dev:server
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
 
-# 2) Start Mobile
-# In a new terminal
-pnpm dev:mobile
+3. Set up environment variables:
+   ```bash
+   cp apps/web/.env.example apps/web/.env.local
+   ```
+   
+   Edit `apps/web/.env.local` and add your API keys and configuration.
+
+4. Run the development server:
+   ```bash
+   pnpm dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Project Structure
+
 ```
-
-- Open the Expo devtools QR code with **Expo Go** to run the app on your device.
-- The mobile app expects `EXPO_PUBLIC_API_URL` to point at the server (defaults to `http://localhost:8787`).
-
----
-
-## Folder Structure
-
+resume-bot/
+├── apps/
+│   ├── web/               # Next.js web application
+│   │   ├── app/           # App Router pages
+│   │   ├── components/    # React components
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── lib/           # Utility functions and libraries
+│   │   └── public/        # Static assets
+│   └── mobile/            # React Native mobile app (Expo)
+├── packages/              # Shared packages (future expansion)
+└── pnpm-workspace.yaml    # PNPM workspace configuration
 ```
-apps/
-  server/        <-- Express API (TypeScript)
-    public/outputs/   <-- Generated PDFs are served from here
-  mobile/        <-- Expo React Native client (TypeScript)
-
-packages/
-  shared/        <-- Shared types/utilities (future expansion)
-```
-
----
 
 ## Environment Variables
 
-### `apps/server/.env`
+The following environment variables are required:
+
 ```
-PORT=8787
-# CORS (comma-separated list). e.g., http://localhost:8081 for Expo
-ALLOWED_ORIGINS=http://localhost:19006,http://localhost:8081
+# Authentication
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key
 
-# AI Provider: deepseek | openrouter | hf
-AI_PROVIDER=deepseek
+# AI Providers (at least one is required)
+OPENAI_API_KEY=your-openai-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key
+GOOGLE_API_KEY=your-google-api-key
 
-# For DeepSeek:
-AI_BASE_URL=https://api.deepseek.com/v1
-AI_MODEL=deepseek-chat
-AI_API_KEY=YOUR_DEEPSEEK_API_KEY
-
-# Or OpenRouter (optionally supports free R1 in some regions/providers):
-# AI_PROVIDER=openrouter
-# AI_BASE_URL=https://openrouter.ai/api/v1
-# AI_MODEL=deepseek/deepseek-r1
-# AI_API_KEY=YOUR_OPENROUTER_KEY
-
-# Or Hugging Face Inference (text-generation):
-# AI_PROVIDER=hf
-# AI_BASE_URL=https://api-inference.huggingface.co/models
-# AI_MODEL=Qwen/Qwen2.5-14B-Instruct
-# AI_API_KEY=YOUR_HF_TOKEN
+# Storage (defaults to local)
+STORAGE_PROVIDER=local
+STORAGE_BASE_URL=http://localhost:3000
 ```
 
-> You can switch providers without changing app code.
+## Health Check
 
----
+The application includes a health check endpoint at `/api/health` that returns the status of the application and environment variables (presence only, not values).
 
-## What it does (today)
-1. **Uploads** your resume file (`.pdf`, `.docx`, `.txt`) + a **job posting URL**
-2. **Extracts** clean text from both sources
-3. **Prompts** the AI to produce:
-   - A **1-page, ATS-optimized resume**
-   - A **1-page cover letter**
-4. **Generates PDFs** and exposes **download links**
+## Development Tools
 
-**Roadmap ideas:**
-- Account system (JWT), Stripe, Postgres (Prisma), storage (S3/Supabase)
-- Versioning & analytics (keyword coverage, verb usage, metrics enrichment)
-- Batch mode for auto-applications
+- **Debug Endpoint**: In development mode, you can view recent errors at `/api/debug/last-errors`
+- **API Testing**: Use the provided Vitest tests to verify API functionality
 
----
+## Deployment
 
-## Deploy notes
-- You can deploy the **API** on Railway/Render/Fly/EC2/etc. (needs persistent disk for outputs or swap to S3).
-- Put the **Mobile** app on TestFlight / Play Console via EAS later. For now, Expo Go is perfect for testing.
+The application can be deployed to any platform that supports Next.js applications:
+
+- Vercel (recommended)
+- Netlify
+- AWS Amplify
+- Self-hosted (Node.js server)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -am 'Add my feature'`
+4. Push to the branch: `git push origin feature/my-feature`
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
