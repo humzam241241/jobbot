@@ -6,7 +6,7 @@ echo.
 REM Ensure we're at the repo root
 cd /d C:\Users\humza\resume_bot
 
-REM --- Optional: Quick Git commit & push (only if there are changes) ---
+REM --- Optional: Quick Git commit & push ---
 git rev-parse --is-inside-work-tree >NUL 2>&1
 if not errorlevel 1 (
     git remote get-url origin >NUL 2>&1
@@ -14,16 +14,10 @@ if not errorlevel 1 (
         echo No git remote configured. Skipping push. To set:
         echo   git remote add origin YOUR_REPO_URL
     ) else (
-        for /f %%i in ('git status --porcelain') do set CHANGED=1
-        if defined CHANGED (
-            echo Changes detected. Committing and pushing...
-            git add -A
-            git commit -m "chore: quick save %DATE% %TIME%" >NUL 2>&1
-            git push -u origin HEAD
-        ) else (
-            echo No changes to commit.
-        )
-        set CHANGED=
+        echo Committing and pushing any changes...
+        git add -A
+        git commit -m "chore: quick save" >NUL 2>&1
+        git push -u origin HEAD
     )
 )
 
