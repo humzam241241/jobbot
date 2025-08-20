@@ -1,0 +1,24 @@
+{
+  "name": "resume-bot",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "pnpm -C apps/web dev",
+    "dev:server": "pnpm -C apps/server dev",
+    "build": "pnpm -r build",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.0.5",
+    "mammoth": "^1.10.0",
+    "pdf-parse": "^1.1.1",
+    "ts-jest": "^29.4.1"
+  }
+}
