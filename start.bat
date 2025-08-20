@@ -120,6 +120,13 @@ echo   Press Ctrl+C to stop
 echo ========================================
 echo.
 
+REM Launch browser after a short delay to ensure server is ready
+start "" cmd /c "timeout /t 5 /nobreak >nul && start http://localhost:3000/jobbot"
+
+REM Optimize Next.js startup performance
+set "NEXT_TELEMETRY_DISABLED=1"
+set "NODE_OPTIONS=--max-old-space-size=4096"
+
 REM Start in current window for better error visibility
 call pnpm --filter @app/web dev
 
