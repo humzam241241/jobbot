@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { htmlToPdfBuffer } from "@/lib/pdf/renderPdf";
@@ -76,15 +76,19 @@ export async function GET(req: NextRequest) {
         sizeBytes: pdfBuffer.length
       };
       
-      // Save the test PDF for inspection
-      const debugDir = path.join(process.cwd(), '..', '..', 'debug');
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
+      try {
+        // Save the test PDF for inspection
+        const debugDir = path.join(process.cwd(), '..', '..', 'debug');
+        if (!fs.existsSync(debugDir)) {
+          fs.mkdirSync(debugDir, { recursive: true });
+        }
+        
+        const testPdfPath = path.join(debugDir, 'test-pdf.pdf');
+        fs.writeFileSync(testPdfPath, pdfBuffer);
+        results.tests.htmlToPdf.savedPath = testPdfPath;
+      } catch (fsError) {
+        logger.warn("Could not save test PDF", { error: fsError });
       }
-      
-      const testPdfPath = path.join(debugDir, 'test-pdf.pdf');
-      fs.writeFileSync(testPdfPath, pdfBuffer);
-      results.tests.htmlToPdf.savedPath = testPdfPath;
       
     } catch (error: any) {
       results.tests.htmlToPdf = {

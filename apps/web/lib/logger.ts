@@ -1,6 +1,13 @@
-import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+
+// Use dynamic imports for Node.js modules to ensure they only run on the server
+let fs: any = null;
+let path: any = null;
+if (typeof window === 'undefined') {
+  // Only import on the server side
+  fs = require('fs');
+  path = require('path');
+}
 
 // Keep track of the last 100 errors
 const MAX_ERROR_LOGS = 100;
@@ -46,6 +53,11 @@ const generateTraceId = () => {
 };
 
 const writeToFile = (level: string, message: string, details?: any) => {
+  // Skip file operations on the client side
+  if (typeof window !== 'undefined' || !fs || !path) {
+    return;
+  }
+  
   try {
     const debugDir = path.join(process.cwd(), '..', '..', 'debug');
     if (!fs.existsSync(debugDir)) {

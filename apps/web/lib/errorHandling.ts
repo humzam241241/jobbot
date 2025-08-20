@@ -1,5 +1,8 @@
 import { logger } from './logger';
 
+// Add server-only marker to ensure this is used correctly
+export const isServer = typeof window === 'undefined';
+
 export interface NetworkError {
   type: 'network';
   message: string;
@@ -36,9 +39,17 @@ export type AppError = NetworkError | ValidationError | ServerError | UnknownErr
  * Handles fetch errors and returns a standardized error object
  */
 export async function handleFetchError(error: any, context?: string): Promise<AppError> {
+  // Use appropriate logger based on environment
+  const log = isServer ? logger : {
+    error: (message: string, details?: any, error?: Error) => {
+      console.error(`[ERROR] ${message}`, details || '', error || '');
+      return Math.random().toString(36).substring(2, 8);
+    }
+  };
+
   // Network errors (ECONNRESET, etc)
   if (error instanceof TypeError && error.message.includes('fetch')) {
-    const traceId = logger.error(`Network error in ${context || 'fetch request'}`, { 
+    const traceId = log.error(`Network error in ${context || 'fetch request'}`, { 
       message: error.message 
     }, error);
     
@@ -77,7 +88,7 @@ export async function handleFetchError(error: any, context?: string): Promise<Ap
   if (error.status && error.json) {
     try {
       const data = await error.json();
-      const traceId = logger.error(`Server error in ${context || 'fetch request'}`, { 
+      const traceId = log.error(`Server error in ${context || 'fetch request'}`, { 
         status: error.status,
         data
       });
@@ -100,7 +111,7 @@ export async function handleFetchError(error: any, context?: string): Promise<Ap
         traceId: data.error?.traceId || traceId
       };
     } catch (jsonError) {
-      const traceId = logger.error(`Failed to parse server error in ${context || 'fetch request'}`, {
+      const traceId = log.error(`Failed to parse server error in ${context || 'fetch request'}`, {
         status: error.status
       }, jsonError as Error);
       
@@ -114,7 +125,7 @@ export async function handleFetchError(error: any, context?: string): Promise<Ap
   }
   
   // Unknown errors
-  const traceId = logger.error(`Unknown error in ${context || 'fetch request'}`, {}, error);
+  const traceId = log.error(`Unknown error in ${context || 'fetch request'}`, {}, error);
   return {
     type: 'unknown',
     message: error.message || 'An unexpected error occurred',
@@ -132,6 +143,18 @@ export async function retryFetch(
   maxRetries = 3,
   initialDelay = 1000
 ): Promise<Response> {
+  // Use appropriate logger based on environment
+  const log = isServer ? logger : {
+    warn: (message: string, details?: any) => {
+      console.warn(`[WARN] ${message}`, details || '');
+      return Math.random().toString(36).substring(2, 8);
+    },
+    error: (message: string, details?: any, error?: Error) => {
+      console.error(`[ERROR] ${message}`, details || '', error || '');
+      return Math.random().toString(36).substring(2, 8);
+    }
+  };
+
   let lastError: any;
   let delay = initialDelay;
   
@@ -156,7 +179,7 @@ export async function retryFetch(
       
       // Don't wait after the last attempt
       if (attempt < maxRetries) {
-        logger.warn(`Fetch attempt ${attempt + 1} failed, retrying in ${delay}ms`, {
+        log.warn(`Fetch attempt ${attempt + 1} failed, retrying in ${delay}ms`, {
           url,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -169,7 +192,7 @@ export async function retryFetch(
   }
   
   // If we get here, all retries failed
-  logger.error(`All ${maxRetries} retry attempts failed`, { url }, lastError);
+  log.error(`All ${maxRetries} retry attempts failed`, { url }, lastError);
   throw lastError;
 }
 

@@ -1,6 +1,26 @@
 import { useState, useCallback } from 'react';
-import { retryFetch, handleFetchError, AppError } from '@/lib/errorHandling';
+import { retryFetch, handleFetchError, AppError, isServer } from '@/lib/errorHandling';
 import { logger } from '@/lib/logger';
+
+// Create a browser-safe console logger as fallback
+const clientLogger = {
+  info: (message: string, details?: any) => {
+    console.info(`[INFO] ${message}`, details || '');
+    return Math.random().toString(36).substring(2, 8); // Generate a simple ID
+  },
+  warn: (message: string, details?: any) => {
+    console.warn(`[WARN] ${message}`, details || '');
+    return Math.random().toString(36).substring(2, 8);
+  },
+  error: (message: string, details?: any, error?: Error) => {
+    console.error(`[ERROR] ${message}`, details || '', error || '');
+    return Math.random().toString(36).substring(2, 8);
+  },
+  debug: (message: string, details?: any) => {
+    console.debug(`[DEBUG] ${message}`, details || '');
+    return Math.random().toString(36).substring(2, 8);
+  }
+};
 
 interface ResumeGenerationOptions {
   onProgress?: (step: string, message: string) => void;
@@ -30,7 +50,10 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
     setError(null);
     setResult(null);
     
-    const traceId = logger.info("Starting resume generation", {
+    // Use appropriate logger based on environment
+    const log = isServer ? logger : clientLogger;
+    
+    const traceId = log.info("Starting resume generation", {
       provider: formData.get('provider'),
       model: formData.get('model'),
       hasResumeFile: !!formData.get('resumeFile'),
@@ -72,12 +95,12 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
           
           // If successful, break out of the loop
           if (response.ok) {
-            logger.info(`Successful response from ${endpoint}`, { traceId });
+            log.info(`Successful response from ${endpoint}`, { traceId });
             break;
           }
         } catch (endpointError: any) {
           lastError = endpointError;
-          logger.warn(`Endpoint ${endpoint} failed`, { error: endpointError }, endpointError instanceof Error ? endpointError : undefined);
+          log.warn(`Endpoint ${endpoint} failed`, { error: endpointError }, endpointError instanceof Error ? endpointError : undefined);
         }
       }
       
@@ -107,7 +130,7 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
         }
       });
       
-      logger.info("Resume generation completed successfully", { 
+      log.info("Resume generation completed successfully", { 
         kitId: data.kitId,
         traceId
       });
@@ -117,7 +140,7 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
       const appError = await handleFetchError(error, 'resume generation');
       setError(appError);
       
-      logger.error("Resume generation failed", { 
+      log.error("Resume generation failed", { 
         error: appError,
         traceId
       });

@@ -183,7 +183,7 @@ export default function ResumeDebugPanel({ visible = false }: DebugPanelProps) {
 
         <div className="bg-gray-100 px-4 py-3 border-t flex justify-between">
           <div className="text-sm text-gray-500">
-            Debug logs are stored in <code>C:\Users\humza\resume_bot\debug\</code>
+            Debug logs are stored in the server's debug directory
           </div>
           <button
             onClick={() => setIsOpen(false)}
