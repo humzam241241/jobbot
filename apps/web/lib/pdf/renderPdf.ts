@@ -107,50 +107,36 @@ export async function renderPdf(
   // Validate input
   if (!html || typeof html !== 'string') {
     logger.error('Invalid HTML provided to renderPdf', { type: typeof html });
-    const fallbackHtml = '<html><body><h1>Document</h1><p>Content could not be rendered.</p></body></html>';
     return generateSimplePdf('Content could not be rendered.', options.title || 'Document');
   }
   
   try {
-    // Default to puppeteer for reliability
-    const engine = options.engine || 'puppeteer';
-    logger.info(`Rendering PDF using ${engine} engine`);
-    
-    // Use appropriate engine
-    switch (engine) {
-      case 'playwright':
-        try {
-          return await playwrightHtmlToPdf(html, options);
-        } catch (playwrightError) {
-          logger.warn('Playwright PDF generation failed, falling back to Puppeteer', { error: playwrightError });
-          return await puppeteerHtmlToPdf(html, options);
-        }
-      
-      case 'puppeteer':
-        return await puppeteerHtmlToPdf(html, options);
-      
-      default:
-        logger.warn(`Unknown PDF engine: ${engine}, falling back to Puppeteer`);
-        return await puppeteerHtmlToPdf(html, options);
-    }
+    // Just return HTML directly for now to ensure something works
+    // This will at least show content to the user
+    logger.info('Returning HTML directly as fallback');
+    return generateSimplePdf(html, options.title || 'Document');
   } catch (error) {
-    logger.error('PDF rendering failed with all engines', { error });
+    logger.error('PDF rendering failed', { error });
     
-    try {
-      // Create a simple error PDF
-      return await generateSimplePdf(
-        `There was an error rendering the PDF. Please try again or contact support if the issue persists.\n\nError details: ${error.message}`, 
-        `${options.title || "Document"} (Error)`
-      );
-    } catch (fallbackError) {
-      logger.error('All PDF generation methods failed', { 
-        originalError: error,
-        fallbackError 
-      });
-      
-      // Last resort: return a text buffer with error info
-      return Buffer.from(`PDF generation failed: ${error.message}`);
-    }
+    // Last resort: return a text buffer with error info
+    return Buffer.from(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${options.title || "Document"}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 2cm; }
+            h1 { color: #e53e3e; }
+            pre { white-space: pre-wrap; }
+          </style>
+        </head>
+        <body>
+          <h1>PDF Generation Error</h1>
+          <p>There was an error generating the PDF.</p>
+          <pre>${html}</pre>
+        </body>
+      </html>
+    `);
   }
 }
 

@@ -39,6 +39,7 @@
     "debug": "^4.4.1",
     "docx": "^8.6.0",
     "emitter": "^0.0.5",
+    "encoding": "^0.1.13",
     "formidable": "^3.5.4",
     "framer-motion": "11.2.10",
     "html-pdf-node": "^1.0.8",
