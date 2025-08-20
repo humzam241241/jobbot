@@ -1,101 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-export const dynamic = "force-dynamic";
+// This endpoint returns the last errors for debugging purposes
+// It's protected and only available for admins
 
-// In-memory ring buffer for last 20 errors
-// Note: This will reset on server restart
-const MAX_ERRORS = 20;
-const errorBuffer: Array<{
-  timestamp: string;
-  code: string;
-  message: string;
-  details?: any;
-  path?: string;
-  telemetryId?: string;
-}> = [];
-
-/**
- * Add an error to the buffer
- * This is exported so it can be used from other API routes
- */
-export function addError(error: {
-  code: string;
-  message: string;
-  details?: any;
-  path?: string;
-  telemetryId?: string;
-}) {
-  // Add timestamp
-  const errorWithTimestamp = {
-    ...error,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Add to buffer (maintaining max size)
-  errorBuffer.unshift(errorWithTimestamp);
-  if (errorBuffer.length > MAX_ERRORS) {
-    errorBuffer.pop();
-  }
-}
-
-/**
- * GET handler for retrieving errors
- * Only available in development mode
- */
 export async function GET(req: NextRequest) {
-  // Only allow in development mode
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json(
-      { error: "This endpoint is only available in development mode" },
-      { status: 403 }
-    );
-  }
-
-  return NextResponse.json({
-    errors: errorBuffer,
-    count: errorBuffer.length,
-    maxCapacity: MAX_ERRORS,
-  });
-}
-
-/**
- * POST handler for adding errors
- * Only available in development mode
- */
-export async function POST(req: NextRequest) {
-  // Only allow in development mode
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json(
-      { error: "This endpoint is only available in development mode" },
-      { status: 403 }
-    );
-  }
-
   try {
-    const body = await req.json();
+    // Check if the user is authenticated and is an admin
+    const session = await getServerSession(authOptions);
+    const isAdmin = session?.user?.email?.endsWith('@ontariotechu.net') || 
+                    session?.user?.email === 'admin@example.com';
     
-    // Validate required fields
-    if (!body.code || !body.message) {
-      return NextResponse.json(
-        { error: "Missing required fields: code, message" },
-        { status: 400 }
-      );
+    if (!isAdmin) {
+      // Allow local development access
+      const host = req.headers.get('host') || '';
+      const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+      
+      if (!isLocalhost) {
+        return NextResponse.json(
+          { error: "Unauthorized. Admin access required." },
+          { status: 403 }
+        );
+      }
     }
-
-    // Add error to buffer
-    addError({
-      code: body.code,
-      message: body.message,
-      details: body.details,
-      path: body.path || req.nextUrl.pathname,
-      telemetryId: body.telemetryId,
+    
+    // Get the last errors from the logger
+    const errors = logger.getLastErrors();
+    
+    return NextResponse.json({
+      count: errors.length,
+      errors
     });
-
-    return NextResponse.json({ ok: true });
   } catch (error) {
+    console.error("Error retrieving debug logs:", error);
     return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
+      { error: "Failed to retrieve debug logs" },
+      { status: 500 }
     );
   }
 }

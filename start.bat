@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 echo ========================================
 echo   JobBot Resume Generator - Startup
 echo ========================================
@@ -43,36 +43,74 @@ echo Checking package manager...
 where pnpm >NUL 2>&1
 if errorlevel 1 (
     echo [+] Installing pnpm...
-    npm install -g pnpm@9.7.0
+    call npm install -g pnpm@9.7.0
+    if errorlevel 1 (
+        echo [!] Failed to install pnpm - trying to continue anyway
+    )
 )
 
 REM Install dependencies
 echo Installing dependencies...
 if not exist node_modules (
-    pnpm install
+    call pnpm install
+    if errorlevel 1 (
+        echo [!] Failed to install dependencies - trying to continue anyway
+    )
 ) else (
     echo [✓] Dependencies already installed
+)
+
+REM Create test data directory if missing
+if not exist apps\web\test\data (
+    echo [+] Creating test data directory...
+    mkdir apps\web\test\data
+    echo [✓] Test data directory created
+)
+
+REM Copy sample PDF if missing
+if not exist apps\web\test\data\05-versions-space.pdf (
+    echo [+] Creating sample test PDF...
+    if exist apps\web\public\downloads\sample-resume.pdf (
+        copy apps\web\public\downloads\sample-resume.pdf apps\web\test\data\05-versions-space.pdf >NUL
+        echo [✓] Sample PDF copied
+    ) else (
+        echo [!] Sample PDF not found - creating empty file
+        echo "Sample PDF" > apps\web\test\data\05-versions-space.pdf
+    )
 )
 
 REM Generate Prisma client
 echo Generating Prisma client...
 cd apps\web
-pnpm prisma generate >NUL 2>&1
+call pnpm prisma generate
 if errorlevel 1 (
     echo [!] Prisma generation failed - trying with npx...
-    npx prisma generate
+    call npx prisma generate
+    if errorlevel 1 (
+        echo [!] Prisma generation failed - continuing anyway
+    )
+) else (
+    echo [✓] Prisma client generated
 )
-echo [✓] Prisma client generated
 
 REM Initialize database if needed
 if not exist prisma\dev.db (
     echo [+] Initializing database...
-    pnpm prisma migrate deploy >NUL 2>&1
-    echo [✓] Database initialized
+    call pnpm prisma migrate deploy
+    if errorlevel 1 (
+        echo [!] Database initialization failed - continuing anyway
+    ) else (
+        echo [✓] Database initialized
+    )
 )
 
 REM Return to root
 cd /d C:\Users\humza\resume_bot
+
+REM Create debug directory
+if not exist debug (
+    mkdir debug
+)
 
 REM Start the development server
 echo.
@@ -83,6 +121,6 @@ echo ========================================
 echo.
 
 REM Start in current window for better error visibility
-pnpm --filter @app/web dev
+call pnpm --filter @app/web dev
 
 endlocal

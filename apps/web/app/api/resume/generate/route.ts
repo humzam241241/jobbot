@@ -4,6 +4,9 @@ import { htmlToPdfBuffer } from "@/lib/pdf/renderPdf";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { generateAny } from "@/lib/ai";
+import { logger } from "@/lib/logger";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -38,7 +41,17 @@ const FormDataSchema = z.object({
 });
 
 function error(code:string, message:string, hint?:string, details?:any, status=400) {
-  return NextResponse.json({ ok:false, error:{code,message,hint,details}},{status});
+  const traceId = logger.error(`Resume generation error: ${message}`, { code, hint, details });
+  return NextResponse.json({ 
+    ok: false, 
+    error: {
+      code,
+      message,
+      hint,
+      details,
+      traceId
+    }
+  }, { status });
 }
 
 export async function GET() {
@@ -50,7 +63,18 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
-  console.log(`[${new Date().toISOString()}] POST /api/resume/generate received`);
+  const traceId = logger.info("Resume generation request received", { 
+    url: req.url,
+    contentType: req.headers.get('content-type')
+  });
+  
+  // Create debug directory for this request
+  const debugDir = path.join(process.cwd(), '..', '..', 'debug', traceId);
+  try {
+    fs.mkdirSync(debugDir, { recursive: true });
+  } catch (err) {
+    logger.warn(`Failed to create debug directory: ${debugDir}`, { error: err });
+  }
 
   try {
     // Handle both JSON and FormData
@@ -64,10 +88,21 @@ export async function POST(req: NextRequest) {
       let masterResumeText = formData.get("masterResumeText") as string || "";
 
       if (file && typeof file.arrayBuffer === "function") {
-        console.log(`[${new Date().toISOString()}] Processing uploaded file: ${file.name} (${file.type})`);
+        logger.info(`Processing uploaded file`, { fileName: file.name, fileType: file.type, traceId });
         try {
           const buffer = Buffer.from(await file.arrayBuffer());
-          console.log(`[${new Date().toISOString()}] File processed: ${file.name}, size: ${buffer.length} bytes`);
+          logger.info(`File processed successfully`, { 
+            fileName: file.name, 
+            sizeBytes: buffer.length,
+            traceId
+          });
+          
+          // Save a copy of the file for debugging
+          try {
+            fs.writeFileSync(path.join(debugDir, `original-${file.name}`), buffer);
+          } catch (err) {
+            logger.warn(`Failed to save debug copy of file`, { fileName: file.name, error: err });
+          }
           
           // Extract text from the file based on its type
           try {
@@ -75,8 +110,15 @@ export async function POST(req: NextRequest) {
               try {
                 const data = await pdfParse(buffer);
                 masterResumeText = data.text;
+                logger.info("PDF parsed successfully", { 
+                  textLength: data.text.length,
+                  traceId
+                });
+                
+                // Save extracted text for debugging
+                fs.writeFileSync(path.join(debugDir, 'extracted-text.txt'), data.text);
               } catch (pdfError) {
-                console.error(`[${new Date().toISOString()}] PDF parsing failed:`, pdfError);
+                logger.error("PDF parsing failed", { fileName: file.name }, pdfError as Error);
                 // Fallback to plain text if PDF parsing fails
                 masterResumeText = `Sample resume content extracted from ${file.name}. 
                 This is fallback content because the PDF parser encountered an error.

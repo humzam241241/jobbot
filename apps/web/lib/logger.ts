@@ -1,128 +1,130 @@
-import { addError } from '@/app/api/debug/last-errors/route';
-import { ErrorCode } from './zod';
+import fs from 'fs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
-// Log levels
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+// Keep track of the last 100 errors
+const MAX_ERROR_LOGS = 100;
+const errorLogs: Array<{
+  id: string;
+  timestamp: string;
+  level: string;
+  message: string;
+  details?: any;
+  stack?: string;
+}> = [];
 
-// Keys that should be redacted in logs
-const SENSITIVE_KEYS = [
-  'api_key',
-  'apiKey',
-  'key',
-  'secret',
-  'password',
-  'token',
-  'auth',
-  'jwt',
-];
+// Redact sensitive information from logs
+const redactSensitiveInfo = (obj: any): any => {
+  if (!obj) return obj;
+  if (typeof obj !== 'object') return obj;
 
-/**
- * Redact sensitive information from objects
- */
-function redactSensitiveInfo(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
+  const sensitiveKeys = [
+    'password', 'token', 'secret', 'key', 'api', 'auth',
+    'credential', 'jwt', 'session', 'cookie'
+  ];
 
-  if (typeof obj !== 'object') {
-    return obj;
-  }
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
 
-  // Handle arrays
-  if (Array.isArray(obj)) {
-    return obj.map((item) => redactSensitiveInfo(item));
-  }
-
-  // Handle objects
-  const result: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(obj)) {
-    // Check if key contains sensitive information
-    const isSensitive = SENSITIVE_KEYS.some((sensitiveKey) => 
-      key.toLowerCase().includes(sensitiveKey.toLowerCase())
-    );
-
-    if (isSensitive) {
-      // Redact the value
-      result[key] = typeof value === 'string' ? '[REDACTED]' : '[REDACTED_OBJECT]';
-    } else if (typeof value === 'object' && value !== null) {
-      // Recursively process nested objects
-      result[key] = redactSensitiveInfo(value);
-    } else {
-      // Pass through non-sensitive values
-      result[key] = value;
+  Object.keys(result).forEach(key => {
+    const lowerKey = key.toLowerCase();
+    
+    // Check if this is a sensitive key
+    if (sensitiveKeys.some(sk => lowerKey.includes(sk))) {
+      result[key] = '[REDACTED]';
+    } else if (typeof result[key] === 'object' && result[key] !== null) {
+      // Recursively check nested objects
+      result[key] = redactSensitiveInfo(result[key]);
     }
-  }
+  });
 
   return result;
-}
+};
 
-/**
- * Create a logger instance with a specific prefix
- */
-export function createLogger(prefix: string, telemetryId?: string) {
-  const logWithLevel = (level: LogLevel, message: string, data?: any) => {
-    const timestamp = new Date().toISOString();
-    const telemetryPrefix = telemetryId ? `[${telemetryId}] ` : '';
-    const logPrefix = `[${timestamp}] [${level.toUpperCase()}] [${prefix}] ${telemetryPrefix}`;
-    
-    // Redact sensitive information
-    const safeData = data ? redactSensitiveInfo(data) : undefined;
-    
-    // Format the log message
-    const logMessage = `${logPrefix}${message}${safeData ? ' ' + JSON.stringify(safeData) : ''}`;
-    
-    // Log to console with appropriate level
-    switch (level) {
-      case 'debug':
-        console.debug(logMessage);
-        break;
-      case 'info':
-        console.info(logMessage);
-        break;
-      case 'warn':
-        console.warn(logMessage);
-        break;
-      case 'error':
-        console.error(logMessage);
-        
-        // Add to error buffer if this is an error
-        if (process.env.NODE_ENV === 'development' && safeData?.code) {
-          try {
-            addError({
-              code: safeData.code,
-              message: message,
-              details: safeData,
-              telemetryId,
-              path: safeData.path,
-            });
-          } catch (e) {
-            // Ignore errors when adding to buffer
-          }
-        }
-        break;
+// Generate a unique ID for each request for tracing
+const generateTraceId = () => {
+  return uuidv4().split('-')[0];
+};
+
+const writeToFile = (level: string, message: string, details?: any) => {
+  try {
+    const debugDir = path.join(process.cwd(), '..', '..', 'debug');
+    if (!fs.existsSync(debugDir)) {
+      fs.mkdirSync(debugDir, { recursive: true });
     }
-  };
-
-  return {
-    debug: (message: string, data?: any) => logWithLevel('debug', message, data),
-    info: (message: string, data?: any) => logWithLevel('info', message, data),
-    warn: (message: string, data?: any) => logWithLevel('warn', message, data),
-    error: (message: string, data?: any) => logWithLevel('error', message, data),
     
-    // Helper for API errors
-    apiError: (code: ErrorCode, message: string, details?: any) => {
-      logWithLevel('error', message, { code, ...details });
-      return {
-        ok: false,
-        code,
-        message,
-        details,
-        telemetryId,
-      };
-    },
-  };
-}
+    const logFile = path.join(debugDir, `${level}.log`);
+    const timestamp = new Date().toISOString();
+    const detailsStr = details ? JSON.stringify(redactSensitiveInfo(details), null, 2) : '';
+    
+    fs.appendFileSync(
+      logFile, 
+      `[${timestamp}] ${message}\n${detailsStr ? detailsStr + '\n' : ''}\n`
+    );
+  } catch (err) {
+    console.error('Failed to write to log file:', err);
+  }
+};
 
-// Default logger instance
-export const logger = createLogger('app');
+// Store error logs in memory for the /api/debug/last-errors endpoint
+const storeErrorLog = (level: string, message: string, details?: any, stack?: string) => {
+  const id = generateTraceId();
+  const timestamp = new Date().toISOString();
+  
+  errorLogs.unshift({
+    id,
+    timestamp,
+    level,
+    message,
+    details: redactSensitiveInfo(details),
+    stack
+  });
+  
+  // Keep only the last MAX_ERROR_LOGS errors
+  if (errorLogs.length > MAX_ERROR_LOGS) {
+    errorLogs.pop();
+  }
+  
+  return id;
+};
+
+export const logger = {
+  debug: (message: string, details?: any) => {
+    console.debug(`[DEBUG] ${message}`, details ? redactSensitiveInfo(details) : '');
+    writeToFile('debug', message, details);
+    return generateTraceId();
+  },
+  
+  info: (message: string, details?: any) => {
+    console.info(`[INFO] ${message}`, details ? redactSensitiveInfo(details) : '');
+    writeToFile('info', message, details);
+    return generateTraceId();
+  },
+  
+  warn: (message: string, details?: any) => {
+    console.warn(`[WARN] ${message}`, details ? redactSensitiveInfo(details) : '');
+    writeToFile('warn', message, details);
+    const id = storeErrorLog('warn', message, details);
+    return id;
+  },
+  
+  error: (message: string, details?: any, error?: Error) => {
+    console.error(`[ERROR] ${message}`, details ? redactSensitiveInfo(details) : '', error || '');
+    writeToFile('error', message, { ...details, stack: error?.stack });
+    const id = storeErrorLog('error', message, details, error?.stack);
+    return id;
+  },
+  
+  critical: (message: string, details?: any, error?: Error) => {
+    console.error(`[CRITICAL] ${message}`, details ? redactSensitiveInfo(details) : '', error || '');
+    writeToFile('critical', message, { ...details, stack: error?.stack });
+    const id = storeErrorLog('critical', message, details, error?.stack);
+    return id;
+  },
+  
+  // Get the last error logs for the debug endpoint
+  getLastErrors: () => {
+    return errorLogs;
+  }
+};
+
+export default logger;
