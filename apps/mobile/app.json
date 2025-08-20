@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "ResumeGen",
+    "slug": "resume-gen",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "resumegen",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:8787"
+    }
+  }
+}
