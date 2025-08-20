@@ -8,11 +8,10 @@
   ],
   "packageManager": "pnpm@9.7.0",
   "scripts": {
-    "dev": "turbo run dev --parallel",
-    "dev:web": "pnpm -C apps/web dev",
-    "dev:server": "pnpm -C apps/server dev",
-    "build": "pnpm -r build",
-    "test": "jest"
+    "dev": "pnpm --filter @app/web dev || pnpm --filter web dev || next dev",
+    "build": "pnpm -r build || next build",
+    "lint": "pnpm -r lint || eslint .",
+    "test": "pnpm -r test || vitest"
   },
   "dependencies": {
     "@types/jest": "^30.0.0",
