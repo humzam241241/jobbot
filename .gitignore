@@ -46,6 +46,13 @@ tmp/
 
 # OS / misc
 .DS_Store
+desktop.ini
+Thumbs.db
+*.tmp
+
+# Screenshots and images that don't belong in repo
+Screenshot*.png
+*.screenshot.png
 
 # Expo
 .expo/
