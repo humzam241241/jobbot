@@ -1,0 +1,10 @@
+@page { margin: 0.5in; }
+body { color: #111; line-height: 1.35; }
+section.sec { margin: 10px 0 14px; }
+h2 { font-weight: 700; margin: 0 0 6px; }
+h3.subheading { margin: 6px 0 4px; font-weight: 600; }
+ul { margin: 4px 0 8px 18px; padding: 0; }
+p { margin: 2px 0 6px; }
+.bullets-disc ul li { list-style-type: disc; }
+.bullets-square ul li { list-style-type: square; }
+.bullets-dash ul li { list-style-type: "-  "; }
