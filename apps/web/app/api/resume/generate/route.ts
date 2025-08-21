@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generatePdfFromHtml } from "@/lib/pdf/serverRenderer";
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PDFGenerationError, createErrorPdf } from "@/lib/pdf/errorHandling";
+import { PDFGenerationError } from "@/lib/pdf/errorHandling";
 import { MasterResumeProps } from "@/components/resume/MasterResume";
 import { CoverLetterProps } from "@/components/resume/CoverLetter";
 import { ATSReportProps, KeywordMatch } from "@/components/resume/ATSReport";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
-import { generateAny } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import fs from "fs";
 import path from "path";
+import MasterResume from "@/components/resume/MasterResume";
+import CoverLetter from "@/components/resume/CoverLetter";
+import ATSReport from "@/components/resume/ATSReport";
+import React from 'react';
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -260,537 +263,155 @@ export async function POST(req: NextRequest) {
     
     console.log(`[${new Date().toISOString()}] Generating tailored resume and cover letter using ${provider} (${model || 'default'})`);
     
-    // Use AI to tailor the resume based on job description
-    const tailoredResumePrompt = `
-You are an expert resume writer. Your task is to tailor the candidate's resume to match the job description provided.
-
-ORIGINAL RESUME:
-${resumeText}
-
-JOB DESCRIPTION:
-${jobText}
-
-${notes ? `ADDITIONAL NOTES FROM CANDIDATE: ${notes}` : ''}
-
-INSTRUCTIONS:
-1. Analyze the job description to identify key requirements, skills, and qualifications.
-2. Carefully review the original resume to understand the candidate's experience and skills.
-3. Create a tailored resume that:
-   - Maintains the original format and structure as much as possible
-   - Emphasizes relevant experience and skills that match the job requirements
-   - Uses keywords from the job description naturally
-   - Quantifies achievements where possible
-   - Is optimized for ATS (Applicant Tracking Systems)
-4. The tailored resume should be formatted in clean HTML with proper sections.
-5. Keep the candidate's original information accurate - don't fabricate experience or skills.
-
-RESPONSE FORMAT:
-Provide the tailored resume as clean HTML with proper semantic structure using <header>, <section>, <h1>, <h2>, <h3>, <p>, <ul>, <li> tags.
-Use appropriate classes for styling: "section" for sections, "experience-header" for job headers, etc.
-`;
-
-    // Use AI to generate a human-like cover letter
-    const coverLetterPrompt = `
-You are an expert cover letter writer. Your task is to create a compelling, personalized cover letter based on the candidate's resume and the job description.
-
-TAILORED RESUME:
-${resumeText}
-
-JOB DESCRIPTION:
-${jobText}
-
-${notes ? `ADDITIONAL NOTES FROM CANDIDATE: ${notes}` : ''}
-
-INSTRUCTIONS:
-1. Write a professional, engaging cover letter that:
-   - Has a natural, human-like tone (not overly formal or robotic)
-   - Specifically connects the candidate's experience to the job requirements
-   - Highlights 2-3 key achievements relevant to the position
-   - Expresses genuine interest in the role and company
-   - Includes a call to action in the closing paragraph
-2. Format: Standard business letter format with greeting, 3-4 paragraphs of body text, and closing
-3. Length: Approximately 250-350 words
-4. Use the candidate's name for the signature
-
-RESPONSE FORMAT:
-Provide the cover letter as clean HTML with proper semantic structure using <header>, <p>, and other appropriate tags.
-`;
-
-    // Generate enhanced ATS report prompt
-    const atsReportPrompt = `
-You are an ATS (Applicant Tracking System) expert. Your task is to provide a comprehensive and detailed analysis of how well the candidate's resume matches the job description.
-
-TAILORED RESUME:
-${resumeText}
-
-JOB DESCRIPTION:
-${jobText}
-
-INSTRUCTIONS:
-1. Provide a detailed, professional ATS analysis report with the following sections:
-
-   A. EXECUTIVE SUMMARY:
-   - Overall match score (percentage)
-      - Brief summary of strengths and weaknesses
-      - 1-2 sentence recommendation
-
-   B. KEYWORD ANALYSIS:
-      - Create a table of the top 10-15 keywords from the job description
-      - For each keyword, indicate:
-        * Presence in resume (Yes/No)
-        * Frequency in resume
-        * Importance level (High/Medium/Low)
-        * Suggested improvement
-
-   C. MISSING CRITICAL KEYWORDS:
-      - List important keywords from the job description that are missing from the resume
-      - For each missing keyword, provide a specific suggestion for how to incorporate it
-
-   D. SKILLS ASSESSMENT:
-      - Technical skills match analysis
-      - Soft skills match analysis
-      - Domain/industry knowledge assessment
-
-   E. RESUME FORMAT & STRUCTURE:
-      - ATS-friendliness score (1-10)
-      - Analysis of section headings and organization
-      - File format and parsing issues (if any)
-      - Recommendations for structural improvements
-
-   F. CONTENT OPTIMIZATION:
-      - Assessment of experience descriptions
-      - Quantification of achievements
-      - Use of action verbs
-      - Specific content improvement suggestions
-
-   G. FINAL RECOMMENDATIONS:
-      - 3-5 prioritized, actionable steps to improve the resume
-      - Specific examples of how to implement each recommendation
-
-2. Make your analysis detailed, specific, and actionable.
-3. Use data-driven insights where possible.
-4. Be honest but constructive in your feedback.
-
-RESPONSE FORMAT:
-Provide the enhanced ATS report as clean, well-structured HTML using proper semantic elements:
-- Use <header>, <section>, <h1>, <h2>, <h3>, <p>, <ul>, <li>, <table>, <tr>, <th>, <td> tags appropriately
-- Include a visual representation of the match score (can be described in text for HTML)
-- Use appropriate styling classes for sections
-- Make the report visually organized and easy to read
-`;
-
-    // Generate tailored resume using AI
-    let resumeHtml = "";
-    let coverLetterHtml = "";
-    let atsReportHtml = "";
+    // Generate PDFs using React components
+    let resumePdfResult, coverLetterPdfResult, atsReportPdfResult;
     
     try {
-      // Generate tailored resume
-      console.log(`[${new Date().toISOString()}] Generating tailored resume...`);
+      logger.info('Generating PDFs with React components', { traceId });
       
-      let resumeResult;
-      try {
-        resumeResult = await generateAny(provider, {
-        system: "You are an expert resume writer that creates ATS-optimized resumes tailored to job descriptions.",
-        user: tailoredResumePrompt,
-        model
-      });
-      } catch (providerError) {
-        logger.error(`Provider ${provider} with model ${model} failed`, { error: providerError });
-        
-        // Try with a different provider if the requested one fails
-        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
-        let succeeded = false;
-        
-        for (const fallbackProvider of fallbackProviders) {
-          if (fallbackProvider === provider) continue;
-          
-          try {
-            logger.info(`Trying fallback provider: ${fallbackProvider}`);
-            resumeResult = await generateAny(fallbackProvider, {
-              system: "You are an expert resume writer that creates ATS-optimized resumes tailored to job descriptions.",
-              user: tailoredResumePrompt
-            });
-            succeeded = true;
-            break;
-          } catch (fallbackError) {
-            logger.warn(`Fallback provider ${fallbackProvider} also failed`, { error: fallbackError });
-          }
-        }
-        
-        if (!succeeded) {
-          throw new Error(`All AI providers failed. Please try again later.`);
-        }
-      }
-      // Ensure we have valid HTML by sanitizing the AI response
-      const sanitizeHtml = (html: string): string => {
-        // Check if the response already has HTML tags
-        if (html.trim().startsWith('<') && html.includes('</')) {
-          return html;
-        }
-        
-        // If it's just text, wrap it in article tags
-        return `<article><p>${html}</p></article>`;
+      // Parse resume content to create props for MasterResume component
+      const resumeProps: MasterResumeProps = {
+        name: name,
+        contact: {
+          email: resumeSections.contact?.match(/[\w.-]+@[\w.-]+\.[\w.-]+/)?.[0] || '',
+          phone: resumeSections.contact?.match(/\(\d{3}\)\s*\d{3}-\d{4}|\d{3}-\d{3}-\d{4}/)?.[0] || '',
+          location: resumeSections.contact?.replace(/[\w.-]+@[\w.-]+\.[\w.-]+|\(\d{3}\)\s*\d{3}-\d{4}|\d{3}-\d{3}-\d{4}/g, '').trim() || ''
+        },
+        summary: resumeSections.summary || resumeSections.profile || '',
+        skills: skills.split(/[,•]/).map(s => s.trim()).filter(s => s.length > 1),
+        experience: [],
+        education: []
       };
       
-      resumeHtml = sanitizeHtml(resumeResult.text);
+      // Parse experience section
+      if (resumeSections.experience) {
+        const expItems = resumeSections.experience.split(/\n\s*\n/);
+        resumeProps.experience = expItems.map(exp => {
+          const lines = exp.split('\n').filter(Boolean);
+          return {
+            title: lines[0] || 'Professional Position',
+            company: lines[1] || 'Company',
+            startDate: lines.find(l => /\d{4}/.test(l))?.match(/\d{4}/)?.[0] || '2020',
+            endDate: 'Present',
+            highlights: lines.slice(2).map(l => l.trim()).filter(Boolean)
+          };
+        });
+      }
       
-      // Generate cover letter
-      console.log(`[${new Date().toISOString()}] Generating cover letter...`);
+      // Parse education section
+      if (resumeSections.education) {
+        const eduItems = resumeSections.education.split(/\n\s*\n/);
+        resumeProps.education = eduItems.map(edu => {
+          const lines = edu.split('\n').filter(Boolean);
+          return {
+            degree: lines[0] || 'Degree',
+            institution: lines[1] || 'Institution',
+            startDate: lines.find(l => /\d{4}/.test(l))?.match(/\d{4}/)?.[0] || '2016',
+            endDate: lines.find(l => /\d{4}/.test(l) && lines.indexOf(l) > 0)?.match(/\d{4}/)?.[0] || '2020',
+            highlights: []
+          };
+        });
+      }
       
-      let coverLetterResult;
-      try {
-        coverLetterResult = await generateAny(provider, {
-        system: "You are an expert cover letter writer with a warm, professional tone.",
-        user: coverLetterPrompt,
-        model
+      // Extract job details
+      const jobLines = jobText.split('\n');
+      let jobTitle = jobLines.find(line => /position|job title|role/i.test(line))?.replace(/position|job title|role/i, '').trim() || 'Position';
+      let company = jobLines.find(line => /company|organization/i.test(line))?.replace(/company|organization/i, '').trim() || 'Company';
+      
+      // Create cover letter props
+      const coverLetterProps: CoverLetterProps = {
+        name: name,
+        contact: {
+          email: resumeProps.contact.email,
+          phone: resumeProps.contact.phone,
+          address: resumeProps.contact.location
+        },
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        recipient: {
+          name: 'Hiring Manager',
+          company: company
+        },
+        paragraphs: [
+          `I am writing to express my interest in the ${jobTitle} position at ${company}. With my background in ${resumeProps.skills.slice(0, 3).join(', ')}, I believe I would be an excellent fit for your team.`,
+          `Throughout my career, I have developed expertise in delivering high-quality solutions that meet business needs. My experience aligns well with the requirements outlined in the job description, particularly in the areas of ${resumeProps.skills.slice(0, 3).join(', ')}.`,
+          `I look forward to the opportunity to discuss how my qualifications would benefit your organization.`
+        ],
+        closing: 'Sincerely,',
+        signature: name
+      };
+      
+      // Create ATS report props
+      const keywordMatches: KeywordMatch[] = resumeProps.skills.slice(0, 10).map(skill => ({
+        keyword: skill,
+        present: true,
+        frequency: 1,
+        importance: Math.random() > 0.7 ? 'High' : Math.random() > 0.5 ? 'Medium' : 'Low'
+      }));
+      
+      const atsReportProps: ATSReportProps = {
+        name: name,
+        jobTitle: jobTitle,
+        company: company,
+        matchScore: Math.floor(Math.random() * 30) + 70, // 70-99%
+        summary: `Your resume shows a strong match with the ${jobTitle} position. With some minor improvements, you could increase your chances of getting past ATS systems.`,
+        keywordMatches: keywordMatches,
+        missingKeywords: [
+          { keyword: 'Project Management', suggestion: 'Include examples of project management experience in your work history.' },
+          { keyword: 'Team Leadership', suggestion: 'Highlight team leadership experience with specific achievements.' }
+        ],
+        skillsAssessment: {
+          technical: `Your technical skills align well with the job requirements. Consider emphasizing ${resumeProps.skills[0]} more prominently.`,
+          soft: 'Your soft skills are represented but could be more explicitly stated.',
+          domain: `Your industry knowledge appears strong, particularly in ${resumeProps.skills.slice(0, 2).join(' and ')}.`
+        },
+        formatAssessment: {
+          score: 8,
+          feedback: 'Your resume has a clear structure that ATS systems can parse well. Consider using more industry-standard section headings.'
+        },
+        contentSuggestions: [
+          'Quantify more of your achievements with specific metrics',
+          'Use more action verbs at the beginning of bullet points',
+          'Ensure consistent formatting throughout your resume'
+        ],
+        recommendations: [
+          `Add more keywords related to ${jobTitle} responsibilities`,
+          'Quantify your achievements with specific metrics and outcomes',
+          'Ensure your resume sections use standard headings for better ATS parsing'
+        ]
+      };
+      
+      // Generate PDFs using server-side rendering
+      const timestamp = Date.now();
+      const fileNameBase = name.toLowerCase().replace(/\s+/g, '_');
+      
+      // Render components to HTML on the server
+      const resumeHtml = renderToStaticMarkup(React.createElement(MasterResume, resumeProps));
+      const coverLetterHtml = renderToStaticMarkup(React.createElement(CoverLetter, coverLetterProps));
+      const atsReportHtml = renderToStaticMarkup(React.createElement(ATSReport, atsReportProps));
+      
+      // Generate PDFs from HTML
+      resumePdfResult = await generatePdfFromHtml(resumeHtml, {
+        title: `${name} - Resume`,
+        fileName: `${fileNameBase}_resume_${timestamp}.pdf`,
+        saveToPath: true
       });
-      } catch (providerError) {
-        logger.error(`Provider ${provider} with model ${model} failed for cover letter`, { error: providerError });
-        
-        // Try with a different provider if the requested one fails
-        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
-        let succeeded = false;
-        
-        for (const fallbackProvider of fallbackProviders) {
-          if (fallbackProvider === provider) continue;
-          
-          try {
-            logger.info(`Trying fallback provider for cover letter: ${fallbackProvider}`);
-            coverLetterResult = await generateAny(fallbackProvider, {
-              system: "You are an expert cover letter writer with a warm, professional tone.",
-              user: coverLetterPrompt
-            });
-            succeeded = true;
-            break;
-          } catch (fallbackError) {
-            logger.warn(`Fallback provider ${fallbackProvider} also failed for cover letter`, { error: fallbackError });
-          }
-        }
-        
-        if (!succeeded) {
-          throw new Error(`All AI providers failed for cover letter. Please try again later.`);
-        }
-      }
-      coverLetterHtml = sanitizeHtml(coverLetterResult.text);
       
-      // Generate ATS report
-      console.log(`[${new Date().toISOString()}] Generating ATS report...`);
-      
-      let atsReportResult;
-      try {
-        atsReportResult = await generateAny(provider, {
-        system: "You are an expert ATS (Applicant Tracking System) analyst.",
-        user: atsReportPrompt,
-        model
+      coverLetterPdfResult = await generatePdfFromHtml(coverLetterHtml, {
+        title: `${name} - Cover Letter`,
+        fileName: `${fileNameBase}_cover_letter_${timestamp}.pdf`,
+        saveToPath: true
       });
-      } catch (providerError) {
-        logger.error(`Provider ${provider} with model ${model} failed for ATS report`, { error: providerError });
-        
-        // Try with a different provider if the requested one fails
-        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
-        let succeeded = false;
-        
-        for (const fallbackProvider of fallbackProviders) {
-          if (fallbackProvider === provider) continue;
-          
-          try {
-            logger.info(`Trying fallback provider for ATS report: ${fallbackProvider}`);
-            atsReportResult = await generateAny(fallbackProvider, {
-              system: "You are an expert ATS (Applicant Tracking System) analyst.",
-              user: atsReportPrompt
-            });
-            succeeded = true;
-            break;
-          } catch (fallbackError) {
-            logger.warn(`Fallback provider ${fallbackProvider} also failed for ATS report`, { error: fallbackError });
-          }
-        }
-        
-        if (!succeeded) {
-          throw new Error(`All AI providers failed for ATS report. Please try again later.`);
-        }
-      }
-      atsReportHtml = sanitizeHtml(atsReportResult.text);
       
-      console.log(`[${new Date().toISOString()}] All content generated successfully`);
-    } catch (aiError: any) {
-      console.error(`[${new Date().toISOString()}] AI generation failed:`, aiError);
+      atsReportPdfResult = await generatePdfFromHtml(atsReportHtml, {
+        title: `ATS Report - ${name}`,
+        fileName: `${fileNameBase}_ats_report_${timestamp}.pdf`,
+        saveToPath: true
+      });
       
-      // Fallback to template-based generation if AI fails
-      console.log(`[${new Date().toISOString()}] Using fallback template-based generation`);
-      
-      // Extract experience
-      const experience = resumeSections.experience || resumeSections.employment || "";
-      const experienceItems = experience.split(/\n\s*\n/);
-      
-      // Create fallback HTML content for resume
-      resumeHtml = `
-        <article>
-          <header>
-            <h1>${name}</h1>
-            <p>${resumeSections.contact || ""}</p>
-          </header>
-          
-          <section class="section">
-            <h2>Professional Summary</h2>
-            <p>${resumeSections.summary || resumeSections.profile || 
-              `Experienced professional with expertise in ${skillsList}. Skilled at delivering exceptional results aligned with business objectives.`}</p>
-          </section>
-          
-          <section class="section">
-            <h2>Skills</h2>
-            <p>${skillsList}</p>
-          </section>
-          
-          <section class="section">
-            <h2>Experience</h2>
-            ${experienceItems.slice(0, 3).map(exp => {
-              const lines = exp.split("\n").filter(Boolean);
-              const title = lines[0] || "Professional Position";
-              const company = lines[1] || "Company";
-              const details = lines.slice(2).map(d => `<li>${d}</li>`).join("");
-              
-              return `
-                <div>
-                  <div class="experience-header">
-                    <span class="experience-title">${title}</span>
-                  </div>
-                  <div class="experience-subtitle">${company}</div>
-                  <ul>${details || "<li>Contributed to company objectives through strategic initiatives</li>"}</ul>
-                </div>
-              `;
-            }).join("")}
-          </section>
-          
-          <section class="section">
-            <h2>Education</h2>
-            <p>${resumeSections.education || "Bachelor's Degree"}</p>
-          </section>
-        </article>
-      `;
-      
-      // Extract job title and company from job description
-      const jobLines = jobText.split("\n");
-      let jobTitle = "Position";
-      let company = "Company";
-      
-      for (const line of jobLines.slice(0, 5)) {
-        if (/position|job title|role/i.test(line) && line.length < 100) {
-          jobTitle = line.replace(/position|job title|role/i, "").trim();
-        }
-        if (/company|organization/i.test(line) && line.length < 100) {
-          company = line.replace(/company|organization/i, "").trim();
-        }
-      }
-      
-      // Create fallback HTML content for cover letter
-      coverLetterHtml = `
-        <article>
-          <header>
-            <h1>Cover Letter</h1>
-            <p>${name}</p>
-          </header>
-          
-          <p>Dear Hiring Manager,</p>
-          
-          <p>I am writing to express my interest in the ${jobTitle} position at ${company}. With my background in ${skillsList}, 
-          I believe I would be an excellent fit for your team.</p>
-          
-          <p>Throughout my career, I have developed expertise in delivering high-quality solutions that meet business needs.
-          My experience aligns well with the requirements outlined in the job description, particularly in the areas of
-          ${skillsList.split(", ").slice(0, 3).join(", ")}.</p>
-          
-          <p>I look forward to the opportunity to discuss how my qualifications would benefit your organization.</p>
-          
-          <p>Sincerely,<br>
-          ${name}</p>
-        </article>
-      `;
-      
-      // Create fallback HTML content for ATS report
-      atsReportHtml = `
-        <article>
-          <header>
-            <h1>ATS Optimization Report</h1>
-          </header>
-          
-          <section class="section">
-            <h2>Match Score</h2>
-            <div class="score">75%</div>
-            <p>Your resume contains many relevant keywords but could be further optimized.</p>
-          </section>
-          
-          <section class="section">
-            <h2>Key Matching Keywords</h2>
-            <ul>
-              ${skillsList.split(", ").slice(0, 5).map(skill => `<li>${skill}</li>`).join("")}
-            </ul>
-          </section>
-          
-          <section class="section">
-            <h2>Recommendations</h2>
-            <ul>
-              <li>Quantify more achievements with specific metrics</li>
-              <li>Ensure all job titles and company names are clearly formatted</li>
-              <li>Consider adding a skills section with keywords from the job description</li>
-            </ul>
-          </section>
-        </article>
-      `;
+    } catch (error) {
+      logger.error('PDF generation failed', { error, traceId });
+      throw error;
     }
-
-    const jobId = `gen_${Date.now()}`;
-    
-          // Generate PDFs using React components
-      let resumePdfResult, coverLetterPdfResult, atsReportPdfResult;
-      
-      try {
-        logger.info('Generating PDFs with React components', { traceId });
-        
-        // Parse resume content to create props for MasterResume component
-        const resumeProps: MasterResumeProps = {
-          name: name,
-          contact: {
-            email: resumeSections.contact?.match(/[\w.-]+@[\w.-]+\.[\w.-]+/)?.[0] || '',
-            phone: resumeSections.contact?.match(/\(\d{3}\)\s*\d{3}-\d{4}|\d{3}-\d{3}-\d{4}/)?.[0] || '',
-            location: resumeSections.contact?.replace(/[\w.-]+@[\w.-]+\.[\w.-]+|\(\d{3}\)\s*\d{3}-\d{4}|\d{3}-\d{3}-\d{4}/g, '').trim() || ''
-          },
-          summary: resumeSections.summary || resumeSections.profile || '',
-          skills: skills.split(/[,•]/).map(s => s.trim()).filter(s => s.length > 1),
-          experience: [],
-          education: []
-        };
-        
-        // Parse experience section
-        if (resumeSections.experience) {
-          const expItems = resumeSections.experience.split(/\n\s*\n/);
-          resumeProps.experience = expItems.map(exp => {
-            const lines = exp.split('\n').filter(Boolean);
-            return {
-              title: lines[0] || 'Professional Position',
-              company: lines[1] || 'Company',
-              startDate: lines.find(l => /\d{4}/.test(l))?.match(/\d{4}/)?.[0] || '2020',
-              endDate: 'Present',
-              highlights: lines.slice(2).map(l => l.trim()).filter(Boolean)
-            };
-          });
-        }
-        
-        // Parse education section
-        if (resumeSections.education) {
-          const eduItems = resumeSections.education.split(/\n\s*\n/);
-          resumeProps.education = eduItems.map(edu => {
-            const lines = edu.split('\n').filter(Boolean);
-            return {
-              degree: lines[0] || 'Degree',
-              institution: lines[1] || 'Institution',
-              startDate: lines.find(l => /\d{4}/.test(l))?.match(/\d{4}/)?.[0] || '2016',
-              endDate: lines.find(l => /\d{4}/.test(l) && lines.indexOf(l) > 0)?.match(/\d{4}/)?.[0] || '2020',
-              highlights: []
-            };
-          });
-        }
-        
-        // Extract job details
-        const jobLines = jobText.split('\n');
-        let jobTitle = jobLines.find(line => /position|job title|role/i.test(line))?.replace(/position|job title|role/i, '').trim() || 'Position';
-        let company = jobLines.find(line => /company|organization/i.test(line))?.replace(/company|organization/i, '').trim() || 'Company';
-        
-        // Create cover letter props
-        const coverLetterProps: CoverLetterProps = {
-          name: name,
-          contact: {
-            email: resumeProps.contact.email,
-            phone: resumeProps.contact.phone,
-            address: resumeProps.contact.location
-          },
-          date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-          recipient: {
-            name: 'Hiring Manager',
-            company: company
-          },
-          paragraphs: [
-            `I am writing to express my interest in the ${jobTitle} position at ${company}. With my background in ${resumeProps.skills.slice(0, 3).join(', ')}, I believe I would be an excellent fit for your team.`,
-            `Throughout my career, I have developed expertise in delivering high-quality solutions that meet business needs. My experience aligns well with the requirements outlined in the job description, particularly in the areas of ${resumeProps.skills.slice(0, 3).join(', ')}.`,
-            `I look forward to the opportunity to discuss how my qualifications would benefit your organization.`
-          ],
-          closing: 'Sincerely,',
-          signature: name
-        };
-        
-        // Create ATS report props
-        const keywordMatches: KeywordMatch[] = resumeProps.skills.slice(0, 10).map(skill => ({
-          keyword: skill,
-          present: true,
-          frequency: 1,
-          importance: Math.random() > 0.7 ? 'High' : Math.random() > 0.5 ? 'Medium' : 'Low'
-        }));
-        
-        const atsReportProps: ATSReportProps = {
-          name: name,
-          jobTitle: jobTitle,
-          company: company,
-          matchScore: Math.floor(Math.random() * 30) + 70, // 70-99%
-          summary: `Your resume shows a strong match with the ${jobTitle} position. With some minor improvements, you could increase your chances of getting past ATS systems.`,
-          keywordMatches: keywordMatches,
-          missingKeywords: [
-            { keyword: 'Project Management', suggestion: 'Include examples of project management experience in your work history.' },
-            { keyword: 'Team Leadership', suggestion: 'Highlight team leadership experience with specific achievements.' }
-          ],
-          skillsAssessment: {
-            technical: `Your technical skills align well with the job requirements. Consider emphasizing ${resumeProps.skills[0]} more prominently.`,
-            soft: 'Your soft skills are represented but could be more explicitly stated.',
-            domain: `Your industry knowledge appears strong, particularly in ${resumeProps.skills.slice(0, 2).join(' and ')}.`
-          },
-          formatAssessment: {
-            score: 8,
-            feedback: 'Your resume has a clear structure that ATS systems can parse well. Consider using more industry-standard section headings.'
-          },
-          contentSuggestions: [
-            'Quantify more of your achievements with specific metrics',
-            'Use more action verbs at the beginning of bullet points',
-            'Ensure consistent formatting throughout your resume'
-          ],
-          recommendations: [
-            `Add more keywords related to ${jobTitle} responsibilities`,
-            'Quantify your achievements with specific metrics and outcomes',
-            'Ensure your resume sections use standard headings for better ATS parsing'
-          ]
-        };
-        
-        // Generate PDFs using server-side rendering
-        const timestamp = Date.now();
-        const fileNameBase = name.toLowerCase().replace(/\s+/g, '_');
-        
-        // Render components to HTML on the server
-        const resumeHtml = renderToStaticMarkup(<MasterResume {...resumeProps} />);
-        const coverLetterHtml = renderToStaticMarkup(<CoverLetter {...coverLetterProps} />);
-        const atsReportHtml = renderToStaticMarkup(<ATSReport {...atsReportProps} />);
-        
-        // Generate PDFs from HTML
-        resumePdfResult = await generatePdfFromHtml(resumeHtml, {
-          title: `${name} - Resume`,
-          fileName: `${fileNameBase}_resume_${timestamp}.pdf`,
-          saveToPath: true
-        });
-        
-        coverLetterPdfResult = await generatePdfFromHtml(coverLetterHtml, {
-          title: `${name} - Cover Letter`,
-          fileName: `${fileNameBase}_cover_letter_${timestamp}.pdf`,
-          saveToPath: true
-        });
-        
-        atsReportPdfResult = await generatePdfFromHtml(atsReportHtml, {
-          title: `ATS Report - ${name}`,
-          fileName: `${fileNameBase}_ats_report_${timestamp}.pdf`,
-          saveToPath: true
-        });
-        
-      } catch (error) {
-        logger.error('PDF generation failed', { error, traceId });
-        throw error;
-      }
     
     // Get the base URL for the application
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`;
@@ -817,7 +438,7 @@ Provide the enhanced ATS report as clean, well-structured HTML using proper sema
     return NextResponse.json({
       ok: true,
       status: "completed",
-      jobId,
+      jobId: `gen_${timestamp}`,
       files: {
         resumePdfUrl: resumeDownloadUrl,
         coverLetterPdfUrl: coverLetterDownloadUrl,
