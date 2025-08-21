@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import puppeteer from 'puppeteer-core';
-import chrome from 'chrome-aws-lambda';
 import { createLogger } from '@/lib/logger';
 import { PDFGenerationError, withPdfErrorHandling, retryWithBackoff } from './errorHandling';
 
@@ -18,28 +17,17 @@ async function getBrowser() {
   if (!browserPromise) {
     browserPromise = (async () => {
       try {
-        // Try to use chrome-aws-lambda for environments like Vercel
-        const executablePath = await chrome.executablePath;
-        
-        if (executablePath) {
-          return puppeteer.launch({
-            args: chrome.args,
-            executablePath,
-            headless: true,
-          });
-        } else {
-          // Fallback to locally installed Chrome
-          return puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            executablePath: 
-              process.platform === 'win32'
-                ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-                : process.platform === 'linux'
-                ? '/usr/bin/google-chrome'
-                : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          });
-        }
+        // Try to use locally installed Chrome
+        return puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          executablePath: 
+            process.platform === 'win32'
+              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+              : process.platform === 'linux'
+              ? '/usr/bin/google-chrome'
+              : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        });
       } catch (error) {
         logger.error('Failed to launch browser', { error });
         throw error;
