@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { GenerationStep } from '@/lib/types/resume';
@@ -5,6 +7,7 @@ import GenerationStepper from '@/components/ui/GenerationStepper';
 import { DocumentArrowUpIcon, DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useLocalStorage } from "react-use";
 import JobDescriptionFallback from '@/components/JobDescriptionFallback';
+import { generateResumeKit } from '@/lib/client/api';
 
 type Kit = {
   kitId: string;
@@ -208,164 +211,55 @@ export default function EnhancedResumeKitForm() {
     }
 
     try {
-      console.log("Submitting form data to /api/resume/generate");
-      // Try multiple endpoints in case one is not working
-      let response;
-      try {
-        // Create a direct fetch to the API endpoint
-        console.log("Sending request directly to /api/resume/generate endpoint");
-        
-        // Try multiple endpoints in sequence
-        const endpoints = [
-          "/api/resume/generate",
-          "/api/generate",
-          "/api/resume-generate"
-        ];
-        
-        let lastError = null;
-        // Create a copy of the form data for each endpoint
-        const formDataEntries = Array.from(formData.entries());
-        
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`Trying endpoint: ${endpoint}`);
-            
-            // Create a new FormData object for each request instead of cloning
-            const newFormData = new FormData();
-            formDataEntries.forEach(([key, value]) => {
-              newFormData.append(key, value);
-            });
-            
-            response = await fetch(endpoint, {
-              method: "POST",
-              body: newFormData,
-            });
-            
-            // If successful, break out of the loop
-            if (response.ok) {
-              console.log(`Successful response from ${endpoint}`);
-              break;
-            } else {
-              console.warn(`Endpoint ${endpoint} returned status ${response.status}`);
-              // Keep trying other endpoints
-            }
-          } catch (fetchError) {
-            console.error(`Fetch to ${endpoint} failed:`, fetchError);
-            lastError = fetchError;
-            // Continue to the next endpoint
-          }
-        }
-        
-        // If we still don't have a valid response, throw the last error
-        if (!response || !response.ok) {
-          console.error("API Response details:", response ? {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries([...response.headers.entries()])
-          } : "No response");
-          
-          // Try to get more details from the response
-          if (response) {
-            try {
-              const errorText = await response.text();
-              console.error("Error response body:", errorText);
-              throw new Error(`API returned error status ${response.status}: ${errorText.substring(0, 100)}`);
-            } catch (readError) {
-              console.error("Failed to read error response:", readError);
-            }
-          }
-          
-          throw lastError || new Error("All API endpoints failed");
-        }
-      } catch (error) {
-        console.error("All API endpoints failed:", error);
-        throw error;
-      }
+      console.log("Submitting form data to generate resume kit");
       
-      console.log("Response status:", response.status);
+      // Use the client API utility to make the request
+      const result = await generateResumeKit(formData);
       
-      // Handle non-JSON responses
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Non-JSON response:", text);
-        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Enhanced error handling with detailed messages
-        let errorMessage = "Resume generation failed";
-        let errorHint = "";
+      console.log("API Success:", result);
+      
+      if (result.message) {
+        setError(null);
         
-        if (result.error) {
-          errorMessage = result.error.message || "Unknown error occurred";
-          errorHint = result.error.hint || "";
-          
-          // Log detailed error information for debugging
-          console.error("API Error Details:", {
-            code: result.error.code,
-            message: result.error.message,
-            hint: result.error.hint,
-            details: result.error.details,
-            status: response.status
-          });
-          
-          // If this is a validation error for missing inputs, preserve the job description text
-          if (result.error.code === "INVALID_INPUT" && jdText) {
-            setJobDescriptionText(jdText);
+        // Create a temporary kit object for display
+        const tempKit = {
+          kitId: result.received ? `test_${Date.now()}` : 'unknown',
+          message: result.message,
+          processingTime: result.processingTime,
+          providerUsedResume: result.received?.provider || 'auto',
+          modelUsedResume: result.received?.model || 'default',
+          files: {
+            resumePdfUrl: '#', // Placeholder for now
+            coverLetterPdfUrl: '#', // Placeholder for now
+            atsReportPdfUrl: '#' // Placeholder for now
           }
-        }
+        };
+        setGeneratedKit(tempKit);
         
-        setError(`${errorMessage}${errorHint ? ` - ${errorHint}` : ''}`);
-      } else {
-        // Handle successful response (test mode for now)
-        console.log("API Success:", result);
+        // Show success message
+        console.log(`Resume generation test successful! Processed in ${result.processingTime}ms`);
+      } else if (result.files) {
+        // Handle file downloads
+        setGeneratedKit(result);
         
-        if (result.message) {
-          setError(null);
-          
-          // Create a temporary kit object for display
-          const tempKit = {
-            kitId: result.received ? `test_${Date.now()}` : 'unknown',
-            message: result.message,
-            processingTime: result.processingTime,
-            providerUsedResume: result.received?.provider || 'auto',
-            modelUsedResume: result.received?.model || 'default',
-            files: {
-              resumePdfUrl: '#', // Placeholder for now
-              coverLetterPdfUrl: '#', // Placeholder for now
-              atsReportPdfUrl: '#' // Placeholder for now
-            }
-          };
-          setGeneratedKit(tempKit);
-          
-          // Show success message
-          console.log(`Resume generation test successful! Processed in ${result.processingTime}ms`);
-        } else if (result.files) {
-          // Handle file downloads
-          setGeneratedKit(result);
-          
-          // Increment generation counter
-          setGenerationCount((prev) => (prev || 0) + 1);
-          
-          // Create downloadable links for the generated files
-          const downloadFile = (dataUrl: string, filename: string) => {
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          };
-          
-          // Download all files
-          downloadFile(result.files.resumePdfUrl, result.files.resumeFileName || 'resume.pdf');
-          downloadFile(result.files.coverLetterPdfUrl, result.files.coverLetterFileName || 'cover_letter.pdf');
-          if (result.files.atsReportPdfUrl) {
-            downloadFile(result.files.atsReportPdfUrl, result.files.atsReportFileName || 'ats_report.pdf');
-          }
+        // Increment generation counter
+        setGenerationCount((prev) => (prev || 0) + 1);
+        
+        // Create downloadable links for the generated files
+        const downloadFile = (dataUrl: string, filename: string) => {
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+        
+        // Download all files
+        downloadFile(result.files.resumePdfUrl, result.files.resumeFileName || 'resume.pdf');
+        downloadFile(result.files.coverLetterPdfUrl, result.files.coverLetterFileName || 'cover_letter.pdf');
+        if (result.files.atsReportPdfUrl) {
+          downloadFile(result.files.atsReportPdfUrl, result.files.atsReportFileName || 'ats_report.pdf');
         }
       }
     } catch (err: any) {

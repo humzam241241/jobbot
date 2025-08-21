@@ -1,3 +1,5 @@
+"use client";
+
 import { Fragment } from 'react';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { GenerationStep } from '@/lib/types/resume';
