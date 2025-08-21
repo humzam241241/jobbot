@@ -119,20 +119,6 @@ if not exist scripts (
     echo [✓] Scripts directory created
 )
 
-REM Copy auto-mark-client script if it doesn't exist
-if not exist scripts\auto-mark-client.ts (
-    echo [+] Creating auto-mark-client script...
-    echo // Auto-mark-client script > scripts\auto-mark-client.ts
-    echo console.log('Script placeholder - will be properly created on first run'); >> scripts\auto-mark-client.ts
-)
-
-REM Copy audit-client-server script if it doesn't exist
-if not exist scripts\audit-client-server.ts (
-    echo [+] Creating audit-client-server script...
-    echo // Audit-client-server script > scripts\audit-client-server.ts
-    echo console.log('Script placeholder - will be properly created on first run'); >> scripts\audit-client-server.ts
-)
-
 REM Start the development server
 echo.
 echo ========================================
