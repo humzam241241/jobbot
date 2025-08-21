@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Simple middleware to add cache control headers
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
-  
-  // Add no-cache headers to prevent caching issues
-  response.headers.set('Cache-Control', 'no-store, max-age=0');
-  response.headers.set('Pragma', 'no-cache');
-  response.headers.set('Expires', '0');
+
+  // Add CORS headers for /api/download routes
+  if (request.nextUrl.pathname.startsWith('/api/download/')) {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  // Add caching headers for /downloads routes
+  if (request.nextUrl.pathname.startsWith('/downloads/')) {
+    response.headers.set('Cache-Control', 'public, max-age=31536000');
+  }
 
   return response;
 }
 
-// Only run middleware on auth routes
 export const config = {
-  matcher: [
-    '/api/auth/:path*',
-    '/login'
-  ],
+  matcher: ['/api/download/:path*', '/downloads/:path*'],
 };

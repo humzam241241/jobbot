@@ -6,19 +6,26 @@ import { GenerationStep } from '@/lib/types/resume';
 import GenerationStepper from '@/components/ui/GenerationStepper';
 import { DocumentArrowUpIcon, DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useLocalStorage } from "react-use";
-import JobDescriptionFallback from '@/components/JobDescriptionFallback';
-import { generateResumeKit } from '@/lib/client/api';
 
-type Kit = {
-  kitId: string;
-  providerUsedResume: string;
-  modelUsedResume: string;
-  files: {
-    resumePdfUrl: string;
-    coverLetterPdfUrl: string;
-    atsReportPdfUrl?: string;
-  };
-};
+interface FileUrls {
+  publicUrl: string;
+  apiUrl: string;
+  fileName: string;
+}
+
+interface GeneratedFiles {
+  resumePdf: FileUrls;
+  resumeDocx: FileUrls;
+  coverPdf: FileUrls;
+  coverDocx: FileUrls;
+  atsPdf: FileUrls;
+}
+
+interface GenerationResult {
+  ok: boolean;
+  traceId: string;
+  files: GeneratedFiles;
+}
 
 const GENERATION_STEPS: GenerationStep[] = [
   {
@@ -65,21 +72,14 @@ export default function EnhancedResumeKitForm() {
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedKit, setGeneratedKit] = useLocalStorage<Kit | null>("generatedKit", null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('auto');
   const [model, setModel] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [steps, setSteps] = useState<GenerationStep[]>(GENERATION_STEPS);
-  const [showJdFallback, setShowJdFallback] = useState(false);
   const [jobDescriptionText, setJobDescriptionText] = useState("");
-  const [providerInfo, setProviderInfo] = useState<{
-    resumeProvider?: string;
-    resumeModel?: string;
-    coverProvider?: string;
-    coverModel?: string;
-  } | null>(null);
+  const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
   
   // Generation counter
   const [generationCount, setGenerationCount] = useLocalStorage<number>("generationCount", 0);
@@ -123,45 +123,6 @@ export default function EnhancedResumeKitForm() {
     ));
   };
 
-  // Check if the URL is from LinkedIn or other sites that block extraction
-  const isBlockedSite = (url: string): boolean => {
-    if (!url || url.trim() === '') return false;
-    
-    try {
-      // Handle malformed URLs by trying to fix them
-      let fixedUrl = url;
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        fixedUrl = 'https://' + url;
-      }
-      
-      const hostname = new URL(fixedUrl).hostname.toLowerCase();
-      return hostname.includes('linkedin.com') || 
-             hostname.includes('indeed.com') ||
-             hostname.includes('glassdoor.com');
-    } catch (e) {
-      console.error('URL parsing error:', e);
-      // If URL is malformed but contains linkedin, indeed, or glassdoor, assume it's blocked
-      const lowerUrl = url.toLowerCase();
-      return lowerUrl.includes('linkedin.com') || 
-             lowerUrl.includes('indeed.com') || 
-             lowerUrl.includes('glassdoor.com');
-    }
-  };
-
-  // Handle submission of pasted job description
-  const handleJdSubmit = async (jdText: string) => {
-    if (!jdText || jdText.trim().length < 30) {
-      setError("Please provide a longer job description.");
-      return;
-    }
-    
-    setJobDescriptionText(jdText);
-    setShowJdFallback(false);
-    
-    // Continue with the generation process using the pasted JD
-    await processGeneration(undefined, jdText);
-  };
-
   const handleGenerate = async () => {
     if (!resumeFile && !masterResumeText) {
       setError("Please upload a resume file or paste your resume text.");
@@ -172,113 +133,141 @@ export default function EnhancedResumeKitForm() {
       return;
     }
 
-    // Check if the URL is from a site that blocks extraction
-    if (jobUrl && isBlockedSite(jobUrl) && !jobDescriptionText) {
-      setShowJdFallback(true);
-      setError(null);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
+    setGenerationResult(null);
     
-    // Process with URL or existing job description text
-    await processGeneration(jobUrl, jobDescriptionText);
-  };
-  
-  // Shared processing logic for both URL and pasted JD paths
-  const processGeneration = async (url?: string, jdText?: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    const formData = new FormData();
-    if (resumeFile) {
-      formData.append("resumeFile", resumeFile);
-    }
-    formData.append("masterResumeText", masterResumeText);
-    
-    // Add either job URL or job description text
-    // Always include jobUrl field even if empty to avoid validation issues
-    formData.append("jobUrl", url || "");
-    if (jdText) {
-      formData.append("jobDescriptionText", jdText);
-    }
-    
-    formData.append("notes", notes);
-    formData.append("provider", provider); // Use selected provider
-    if (model) {
-      formData.append("model", model);
-    }
-
     try {
-      console.log("Submitting form data to generate resume kit");
-      
-      // Use the client API utility to make the request
-      const result = await generateResumeKit(formData);
-      
-      console.log("API Success:", result);
-      
-      if (result.message) {
-        setError(null);
-        
-        // Create a temporary kit object for display
-        const tempKit = {
-          kitId: result.received ? `test_${Date.now()}` : 'unknown',
-          message: result.message,
-          processingTime: result.processingTime,
-          providerUsedResume: result.received?.provider || 'auto',
-          modelUsedResume: result.received?.model || 'default',
-          files: {
-            resumePdfUrl: '#', // Placeholder for now
-            coverLetterPdfUrl: '#', // Placeholder for now
-            atsReportPdfUrl: '#' // Placeholder for now
-          }
-        };
-        setGeneratedKit(tempKit);
-        
-        // Show success message
-        console.log(`Resume generation test successful! Processed in ${result.processingTime}ms`);
-      } else if (result.files) {
-        // Handle file downloads
-        setGeneratedKit(result);
-        
-        // Increment generation counter
-        setGenerationCount((prev) => (prev || 0) + 1);
-        
-        // Create downloadable links for the generated files
-        const downloadFile = (dataUrl: string, filename: string) => {
-          const link = document.createElement('a');
-          link.href = dataUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        };
-        
-        // Download all files
-        downloadFile(result.files.resumePdfUrl, result.files.resumeFileName || 'resume.pdf');
-        downloadFile(result.files.coverLetterPdfUrl, result.files.coverLetterFileName || 'cover_letter.pdf');
-        if (result.files.atsReportPdfUrl) {
-          downloadFile(result.files.atsReportPdfUrl, result.files.atsReportFileName || 'ats_report.pdf');
-        }
+      const formData = new FormData();
+      if (resumeFile) {
+        formData.append("resumeFile", resumeFile);
       }
+      formData.append("masterResumeText", masterResumeText);
+      formData.append("jobUrl", jobUrl || "");
+      if (jobDescriptionText) {
+        formData.append("jobDescriptionText", jobDescriptionText);
+      }
+      formData.append("notes", notes);
+      formData.append("provider", provider);
+      if (model) {
+        formData.append("model", model);
+      }
+
+      const response = await fetch('/api/resume/generate', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Resume generation failed');
+      }
+      
+      const result = await response.json();
+      if (!result.ok) {
+        throw new Error(result.error || 'Resume generation failed');
+      }
+
+      setGenerationResult(result);
+      setGenerationCount((prev) => (prev || 0) + 1);
+      setCurrentStep('done');
     } catch (err: any) {
-      console.error("Generation fetch error:", err);
-      setError(`An unexpected error occurred: ${err.message}`);
-      
-      // Preserve job description text on error
-      if (jdText) {
-        setJobDescriptionText(jdText);
-      }
+      console.error("Generation error:", err);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const renderDownloadButtons = () => {
+    if (!generationResult) return null;
+
+    const { files, traceId } = generationResult;
+    return (
+      <div className="space-y-6 mt-6">
+        <div className="text-xs text-gray-500">Trace ID: {traceId}</div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Resume */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Tailored Resume</h4>
+            <div className="flex flex-col gap-2">
+              <a 
+                href={files.resumePdf.publicUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+              >
+                View Resume (PDF)
+              </a>
+              <a 
+                href={files.resumeDocx.publicUrl}
+                download
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+              >
+                Download Resume (DOCX)
+              </a>
+              <div className="text-xs text-center text-gray-500">
+                <a href={files.resumePdf.apiUrl} className="hover:underline">PDF fallback</a>
+                {" · "}
+                <a href={files.resumeDocx.apiUrl} className="hover:underline">DOCX fallback</a>
+              </div>
+            </div>
+          </div>
+
+          {/* Cover Letter */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Cover Letter</h4>
+            <div className="flex flex-col gap-2">
+              <a 
+                href={files.coverPdf.publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+              >
+                View Cover Letter (PDF)
+              </a>
+              <a 
+                href={files.coverDocx.publicUrl}
+                download
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+              >
+                Download Cover Letter (DOCX)
+              </a>
+              <div className="text-xs text-center text-gray-500">
+                <a href={files.coverPdf.apiUrl} className="hover:underline">PDF fallback</a>
+                {" · "}
+                <a href={files.coverDocx.apiUrl} className="hover:underline">DOCX fallback</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ATS Report */}
+        <div className="border rounded-lg p-4">
+          <h4 className="font-medium mb-2">ATS Analysis</h4>
+          <div className="flex flex-col gap-2">
+            <a 
+              href={files.atsPdf.publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+            >
+              View ATS Report (PDF)
+            </a>
+            <div className="text-xs text-center text-gray-500">
+              <a href={files.atsPdf.apiUrl} className="hover:underline">PDF fallback</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="rounded-2xl bg-card border border-border shadow-soft">
       <div className="px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold text-muted-foreground">Generate Resume Kit</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">Resume Generator</h3>
       </div>
       <div className="p-5 space-y-4">
         {/* Dropzone */}
@@ -327,7 +316,7 @@ export default function EnhancedResumeKitForm() {
           />
         </div>
 
-        {/* Job Description Text - Always visible */}
+        {/* Job Description Text */}
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">
             {jobUrl ? "Extracted/Pasted Job Description" : "Paste Job Description"}
@@ -389,24 +378,9 @@ export default function EnhancedResumeKitForm() {
           onChange={(e) => setNotes(e.target.value)}
         />
         
-        {error && !showJdFallback && (
+        {error && (
           <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
             {error}
-          </div>
-        )}
-        
-        {/* Job Description Fallback */}
-        {showJdFallback && (
-          <div className="my-4">
-            <JobDescriptionFallback 
-              onSubmit={handleJdSubmit}
-              onDismiss={() => {
-                setShowJdFallback(false);
-                setJobUrl("");
-              }}
-              asModal={false}
-              initialText={jobDescriptionText} // Pass any existing JD text
-            />
           </div>
         )}
 
@@ -420,16 +394,13 @@ export default function EnhancedResumeKitForm() {
         <button
           className="w-full rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring/70 disabled:opacity-60 disabled:cursor-not-allowed"
           onClick={handleGenerate}
-          disabled={isLoading || showJdFallback}
+          disabled={isLoading}
         >
           {isLoading ? "Generating..." : "Generate Resume Kit"}
         </button>
 
-        {generatedKit && (
-          <div className="rounded-xl border border-border bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-            Successfully generated kit {generatedKit.kitId} using {generatedKit.providerUsedResume} ({generatedKit.modelUsedResume}).
-          </div>
-        )}
+        {/* Download Buttons */}
+        {renderDownloadButtons()}
       </div>
     </div>
   );
