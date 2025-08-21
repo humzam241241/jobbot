@@ -311,9 +311,9 @@ RESPONSE FORMAT:
 Provide the cover letter as clean HTML with proper semantic structure using <header>, <p>, and other appropriate tags.
 `;
 
-    // Generate ATS report prompt
+    // Generate enhanced ATS report prompt
     const atsReportPrompt = `
-You are an ATS (Applicant Tracking System) expert. Your task is to analyze how well the candidate's resume matches the job description and provide an optimization report.
+You are an ATS (Applicant Tracking System) expert. Your task is to provide a comprehensive and detailed analysis of how well the candidate's resume matches the job description.
 
 TAILORED RESUME:
 ${resumeText}
@@ -322,18 +322,56 @@ JOB DESCRIPTION:
 ${jobText}
 
 INSTRUCTIONS:
-1. Analyze the match between the resume and job description.
-2. Provide a detailed report that includes:
-   - Overall match score (percentage)
-   - Key keywords found in both the resume and job description
-   - Missing important keywords that should be added
-   - Suggestions for improving the resume's ATS compatibility
-   - Format and structure recommendations
-3. Be specific and actionable in your recommendations.
+1. Provide a detailed, professional ATS analysis report with the following sections:
+
+   A. EXECUTIVE SUMMARY:
+      - Overall match score (percentage)
+      - Brief summary of strengths and weaknesses
+      - 1-2 sentence recommendation
+
+   B. KEYWORD ANALYSIS:
+      - Create a table of the top 10-15 keywords from the job description
+      - For each keyword, indicate:
+        * Presence in resume (Yes/No)
+        * Frequency in resume
+        * Importance level (High/Medium/Low)
+        * Suggested improvement
+
+   C. MISSING CRITICAL KEYWORDS:
+      - List important keywords from the job description that are missing from the resume
+      - For each missing keyword, provide a specific suggestion for how to incorporate it
+
+   D. SKILLS ASSESSMENT:
+      - Technical skills match analysis
+      - Soft skills match analysis
+      - Domain/industry knowledge assessment
+
+   E. RESUME FORMAT & STRUCTURE:
+      - ATS-friendliness score (1-10)
+      - Analysis of section headings and organization
+      - File format and parsing issues (if any)
+      - Recommendations for structural improvements
+
+   F. CONTENT OPTIMIZATION:
+      - Assessment of experience descriptions
+      - Quantification of achievements
+      - Use of action verbs
+      - Specific content improvement suggestions
+
+   G. FINAL RECOMMENDATIONS:
+      - 3-5 prioritized, actionable steps to improve the resume
+      - Specific examples of how to implement each recommendation
+
+2. Make your analysis detailed, specific, and actionable.
+3. Use data-driven insights where possible.
+4. Be honest but constructive in your feedback.
 
 RESPONSE FORMAT:
-Provide the ATS report as clean HTML with proper semantic structure using <header>, <section>, <h1>, <h2>, <h3>, <p>, <ul>, <li> tags.
-Include a visual representation of the match score.
+Provide the enhanced ATS report as clean, well-structured HTML using proper semantic elements:
+- Use <header>, <section>, <h1>, <h2>, <h3>, <p>, <ul>, <li>, <table>, <tr>, <th>, <td> tags appropriately
+- Include a visual representation of the match score (can be described in text for HTML)
+- Use appropriate styling classes for sections
+- Make the report visually organized and easy to read
 `;
 
     // Generate tailored resume using AI
@@ -513,17 +551,17 @@ Include a visual representation of the match score.
     const resumePdfBuffer = await renderPdf(resumeHtml, { 
       title: "Tailored Resume", 
       size: "Letter",
-      engine: "puppeteer"
+      engine: "direct"  // Use the direct PDF generator
     });
     const coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
       title: "Cover Letter", 
       size: "Letter",
-      engine: "puppeteer"
+      engine: "direct"  // Use the direct PDF generator
     });
     const atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
       title: "ATS Report", 
       size: "Letter",
-      engine: "puppeteer"
+      engine: "direct"  // Use the direct PDF generator
     });
     
     return NextResponse.json({

@@ -33,12 +33,20 @@ export function useTokens() {
     setError(null);
 
     try {
-      if (!tokensRemaining || tokensRemaining <= 0) {
+      const currentTokens = tokensRemaining || 0;
+      
+      if (currentTokens <= 0) {
         throw new Error('No tokens remaining. Please try again tomorrow.');
       }
 
-      // Deduct one token
-      setTokensRemaining(prev => Math.max(0, (prev || 0) - 1));
+      // Deduct one token and force immediate update
+      const newTokenCount = Math.max(0, currentTokens - 1);
+      setTokensRemaining(newTokenCount);
+      
+      // Force localStorage update
+      localStorage.setItem(TOKEN_STORAGE_KEY, newTokenCount.toString());
+      
+      console.log(`Token used. Remaining: ${newTokenCount}/${MAX_TOKENS}`);
       return true;
     } catch (err: any) {
       setError(err.message);

@@ -2,6 +2,7 @@ import { chromium, Browser } from "playwright";
 import { wrapForPrint } from "./sanitize";
 import { createLogger } from "@/lib/logger";
 import { puppeteerHtmlToPdf, generateSimplePdf } from "./puppeteerRenderer";
+import { generateDirectPdf } from "./directPdf";
 
 const logger = createLogger('pdf-renderer');
 
@@ -101,7 +102,7 @@ export async function renderPdf(
   options: { 
     title?: string; 
     size?: "Letter"|"A4";
-    engine?: "playwright" | "puppeteer";
+    engine?: "direct" | "playwright" | "puppeteer";
   } = {}
 ): Promise<Buffer> {
   // Validate input
@@ -111,7 +112,16 @@ export async function renderPdf(
   }
   
   try {
-    // Add default styling to ensure content is visible
+    // Use the direct PDF generator by default
+    const engine = options.engine || 'direct';
+    logger.info(`Generating PDF using ${engine} engine`);
+    
+    if (engine === 'direct') {
+      // Use the most reliable method first
+      return await generateDirectPdf(html, options);
+    }
+    
+    // Add default styling for other engines
     const styledHtml = `
       <!DOCTYPE html>
       <html>
@@ -150,24 +160,22 @@ export async function renderPdf(
       </html>
     `;
     
-    // Try to generate PDF
+    // Try other engines if specified
     try {
-      logger.info('Generating PDF with Puppeteer');
-      return await puppeteerHtmlToPdf(styledHtml, options);
-    } catch (puppeteerError) {
-      logger.warn('Puppeteer PDF generation failed, falling back to Playwright', { error: puppeteerError });
-      try {
+      if (engine === 'puppeteer') {
+        return await puppeteerHtmlToPdf(styledHtml, options);
+      } else if (engine === 'playwright') {
         return await playwrightHtmlToPdf(styledHtml, options);
-      } catch (playwrightError) {
-        logger.error('All PDF generation attempts failed', { 
-          puppeteerError,
-          playwrightError
-        });
-        throw playwrightError;
+      } else {
+        // Fallback to direct if unknown engine
+        return await generateDirectPdf(html, options);
       }
+    } catch (engineError) {
+      logger.warn(`${engine} PDF generation failed, falling back to direct method`, { error: engineError });
+      return await generateDirectPdf(html, options);
     }
   } catch (error) {
-    logger.error('PDF rendering failed', { error });
+    logger.error('All PDF rendering methods failed', { error });
     
     // Return a simple error PDF
     return generateSimplePdf(`
