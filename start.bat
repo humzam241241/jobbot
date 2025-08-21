@@ -112,6 +112,27 @@ if not exist debug (
     mkdir debug
 )
 
+REM Create scripts directory if missing
+if not exist scripts (
+    echo [+] Creating scripts directory...
+    mkdir scripts
+    echo [✓] Scripts directory created
+)
+
+REM Copy auto-mark-client script if it doesn't exist
+if not exist scripts\auto-mark-client.ts (
+    echo [+] Creating auto-mark-client script...
+    echo // Auto-mark-client script > scripts\auto-mark-client.ts
+    echo console.log('Script placeholder - will be properly created on first run'); >> scripts\auto-mark-client.ts
+)
+
+REM Copy audit-client-server script if it doesn't exist
+if not exist scripts\audit-client-server.ts (
+    echo [+] Creating audit-client-server script...
+    echo // Audit-client-server script > scripts\audit-client-server.ts
+    echo console.log('Script placeholder - will be properly created on first run'); >> scripts\audit-client-server.ts
+)
+
 REM Start the development server
 echo.
 echo ========================================
@@ -129,5 +150,22 @@ set "NODE_OPTIONS=--max-old-space-size=4096"
 
 REM Start in current window for better error visibility
 call pnpm --filter @app/web dev
+
+REM If the server exits for any reason, don't close the window immediately
+if errorlevel 1 (
+    echo.
+    echo ========================================
+    echo   [!] Server exited with an error
+    echo ========================================
+    echo.
+    pause
+) else (
+    echo.
+    echo ========================================
+    echo   Server stopped
+    echo ========================================
+    echo.
+    pause
+)
 
 endlocal
