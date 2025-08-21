@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { GenerationStep } from '@/lib/types/resume';
 import GenerationStepper from '@/components/ui/GenerationStepper';
-import { DocumentArrowUpIcon, DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { DocumentArrowUpIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import PDFPreview from './PDFPreview';
 import { useLocalStorage } from "react-use";
 import { useTokens } from "@/hooks/useTokens";
 import JobDescriptionFallback from '@/components/JobDescriptionFallback';
@@ -573,39 +574,27 @@ export default function EnhancedResumeKitFormV2() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a
-              href={tempKit.files.resumePdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center p-4 border border-gray-200 rounded-md hover:bg-gray-50"
-            >
-              <DocumentTextIcon className="h-12 w-12 text-blue-500 mb-2" />
-              <span className="font-medium">Tailored Resume</span>
-              <span className="text-sm text-gray-500">Download PDF</span>
-            </a>
+            <PDFPreview
+              pdfUrl={tempKit.files.resumePdfUrl}
+              fileName={tempKit.files.resumeFileName || 'resume.pdf'}
+              title="Tailored Resume"
+              iconColor="text-blue-500"
+            />
             
-            <a
-              href={tempKit.files.coverLetterPdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center p-4 border border-gray-200 rounded-md hover:bg-gray-50"
-            >
-              <DocumentTextIcon className="h-12 w-12 text-green-500 mb-2" />
-              <span className="font-medium">Cover Letter</span>
-              <span className="text-sm text-gray-500">Download PDF</span>
-            </a>
+            <PDFPreview
+              pdfUrl={tempKit.files.coverLetterPdfUrl}
+              fileName={tempKit.files.coverLetterFileName || 'cover_letter.pdf'}
+              title="Cover Letter"
+              iconColor="text-green-500"
+            />
             
             {tempKit.files.atsReportPdfUrl && (
-              <a
-                href={tempKit.files.atsReportPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center p-4 border border-gray-200 rounded-md hover:bg-gray-50"
-              >
-                <DocumentTextIcon className="h-12 w-12 text-purple-500 mb-2" />
-                <span className="font-medium">ATS Report</span>
-                <span className="text-sm text-gray-500">Download PDF</span>
-              </a>
+              <PDFPreview
+                pdfUrl={tempKit.files.atsReportPdfUrl}
+                fileName={tempKit.files.atsReportFileName || 'ats_report.pdf'}
+                title="ATS Report"
+                iconColor="text-purple-500"
+              />
             )}
           </div>
 
