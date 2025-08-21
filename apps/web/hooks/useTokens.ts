@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from 'react-use';
 
-const MAX_TOKENS = 30;
+const MAX_TOKENS = 30; // Maximum number of generations allowed per day
 const TOKEN_STORAGE_KEY = 'jobbot-tokens-remaining';
 
 export function useTokens() {
-  const [tokensRemaining, setTokensRemaining] = useLocalStorage(TOKEN_STORAGE_KEY, MAX_TOKENS);
+  const [tokensRemaining, setTokensRemaining] = useLocalStorage<number>(TOKEN_STORAGE_KEY, MAX_TOKENS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +56,11 @@ export function useTokens() {
     }
   };
 
-  const getTokensRemaining = () => tokensRemaining || 0;
+  const getTokensRemaining = () => {
+    // Force read from localStorage to ensure we have the latest value
+    const storedValue = localStorage.getItem(TOKEN_STORAGE_KEY);
+    return storedValue ? parseInt(storedValue, 10) : MAX_TOKENS;
+  };
 
   return {
     tokensRemaining: getTokensRemaining(),

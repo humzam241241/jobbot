@@ -22,43 +22,48 @@ export default function TopNav() {
   const { data: session } = useSession();
   
   // Token monitoring state - limited to exactly 30 generations
-  const TOKENS_PER_GENERATION = 10000;
   const MAX_GENERATIONS = 30;
-  const [tokenStats, setTokenStats] = useLocalStorage<TokenStats>("tokenStats", {
-    total: TOKENS_PER_GENERATION * MAX_GENERATIONS, // 300,000 tokens (30 generations)
+  const [tokenStats, setTokenStats] = useState<TokenStats>({
+    total: MAX_GENERATIONS,
     used: 0,
-    leftover: TOKENS_PER_GENERATION * MAX_GENERATIONS
+    leftover: MAX_GENERATIONS
   });
   
-  // For demo purposes, simulate token usage based on generations
+  // Read token usage from localStorage
   useEffect(() => {
-    // In a real implementation, this would fetch from an API
-    const interval = setInterval(() => {
-      setTokenStats?.(prev => {
-        if (!prev) return { 
-          total: TOKENS_PER_GENERATION * MAX_GENERATIONS, 
-          used: 0, 
-          leftover: TOKENS_PER_GENERATION * MAX_GENERATIONS 
-        };
+    const updateTokenStats = () => {
+      try {
+        // Read generation count
+        const generationCount = localStorage.getItem('jobbot-generation-count');
+        const usedTokens = generationCount ? parseInt(generationCount, 10) : 0;
         
-        // Occasionally use a full generation's worth of tokens
-        const shouldUseGeneration = Math.random() < 0.05; // 5% chance each minute
+        // Read remaining tokens
+        const remainingTokens = localStorage.getItem('jobbot-tokens-remaining');
+        const tokensLeft = remainingTokens ? parseInt(remainingTokens, 10) : MAX_GENERATIONS;
         
-        if (shouldUseGeneration && prev.leftover >= TOKENS_PER_GENERATION) {
-          const used = prev.used + TOKENS_PER_GENERATION;
-          return {
-            total: prev.total,
-            used: used,
-            leftover: prev.total - used
-          };
-        }
-        
-        return prev;
-      });
-    }, 60000); // Update every minute
+        setTokenStats({
+          total: MAX_GENERATIONS,
+          used: usedTokens,
+          leftover: tokensLeft
+        });
+      } catch (error) {
+        console.error('Error reading token stats:', error);
+      }
+    };
     
-    return () => clearInterval(interval);
-  }, [setTokenStats]);
+    // Update immediately and then every second
+    updateTokenStats();
+    const interval = setInterval(updateTokenStats, 1000);
+    
+    // Add storage event listener to detect changes from other tabs
+    const handleStorageChange = () => updateTokenStats();
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Filter items based on user role
   const visibleItems = NAV_ITEMS.filter((item: NavItem) => {
@@ -131,13 +136,13 @@ export default function TopNav() {
               <div className="flex items-center h-full px-3 bg-amber-600/20 text-amber-400 border-r border-neutral-700">
                 <div className="flex flex-col justify-center">
                   <span className="text-xs font-medium">Used</span>
-                  <span className="text-sm font-semibold">{Math.floor((tokenStats?.used || 0) / TOKENS_PER_GENERATION)}</span>
+                  <span className="text-sm font-semibold">{tokenStats?.used || 0}</span>
                 </div>
               </div>
               <div className="flex items-center h-full px-3 rounded-r-xl bg-emerald-600/20 text-emerald-400">
                 <div className="flex flex-col justify-center">
                   <span className="text-xs font-medium">Left</span>
-                  <span className="text-sm font-semibold">{Math.floor((tokenStats?.leftover || 0) / TOKENS_PER_GENERATION)}</span>
+                  <span className="text-sm font-semibold">{tokenStats?.leftover || 0}</span>
                 </div>
               </div>
             </Link>
@@ -151,7 +156,7 @@ export default function TopNav() {
               title="Generations Left"
             >
               <Gauge className="h-4 w-4 text-emerald-400" />
-              <span>{Math.floor((tokenStats?.leftover || 0) / TOKENS_PER_GENERATION)}</span>
+              <span>{tokenStats?.leftover || 0}</span>
             </Link>
           )}
           

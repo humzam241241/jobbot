@@ -215,11 +215,8 @@ export default function EnhancedResumeKitFormV2() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check if we have tokens available
-    const canUseToken = await useToken();
-    if (!canUseToken) {
-      return;
-    }
+    // We don't need to check tokens here as the useResumeGeneration hook already does this
+    // The token will be deducted after successful generation
 
     // Reset steps
     setSteps(GENERATION_STEPS.map(step => ({ ...step, status: 'pending' })));
@@ -254,7 +251,10 @@ export default function EnhancedResumeKitFormV2() {
     
     if (data) {
       // Update generation count
-      setGenerationCount((prev) => (prev || 0) + 1);
+      const newCount = (generationCount || 0) + 1;
+      setGenerationCount(newCount);
+      // Ensure it's immediately available in localStorage
+      localStorage.setItem('jobbot-generation-count', newCount.toString());
       
       // Create a temporary kit object
       setTempKit({
