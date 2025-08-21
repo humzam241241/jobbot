@@ -1,0 +1,55 @@
+
+
+HUMZA MUHAMMAD 
+ Pickering, ON | 905-749-6855 | humza.muhammad1@ontariotechu.net | LinkedIn 
+PROFILE 
+Mechanical Engineering (Co-op) student (CGPA 3.75, President's List) with expertise in SolidWorks (GD&T, FEA, CFD), prototyping, and 
+embedded systems (Arduino, C++). Skilled in 3D printing, tolerance analysis, and DFM, with proven success leading projects and 
+optimizing mechanical systems, including a 49% weight reduction in drone design. Seeking a Mechanical Engineering Co-op to apply 
+technical innovation, leadership, and data-driven design solutions to real-world challenges. 
+ 
+TECHNICAL SKILLS 
+Design & Simulation: SolidWorks (3D Modeling, Assemblies, GD&T, FEA, CFD), Fusion 360, Simmens NX 
+Programming: C++, Python, Arduino IDE, MATLAB, EES, MAPLE  
+Prototyping: 3D Printing (FDM), Soldering, Mechanical Assembly  
+Electronics: Multisim (AC/DC Circuit Design), Microcontroller Integration 
+Engineering Tools: DFMEA, Tolerance Stack-Up, Material Selection (PLA), ANSI, NFPA 70E, OSHA, Lockout/Tagout 
+(LOTO) Productivity: Microsoft Excel, Word, PowerPoint  
+Certifications: WHMIS 2021 (May 2025)  
+ 
+EDUCATION  
+Bachelor of Engineering (Honours) - Mechanical Engineering (Co-op), Artificial Intelligence Specialization, Ontario Tech 
+University - Oshawa, ON | Sept 2022 - May 2028 CGPA: 3.75 | President's List (Multiple Terms)  
+ 
+PROJECT EXPERIENCE  
+Modular Drone Development | Personal Project | Feb 2023 - Present 
+● Acted as project manager for Version 1, leading design reviews, CAD modeling, and manufacturing drawings. 
+● Solely Engineered Version 2 with FEA on frame components and CFD analysis for aerodynamic optimization. 
+● Integrated ESCs, LiPo batteries, brushless motors, and an 8-channel receiver to ensure stable performance. 
+● Programmed a custom flight controller (Arduino IDE, C++) achieving autonomous hover and flight stability. 
+● Delivered 49% weight reduction, 3 kg payload capacity, and 5-7 minutes flight time after iterative testing.  
+Scissor Lift Design | Engineering Design Course | Jan 2023 - Apr 2023 
+● Designed a 14-18 ft mobile scissor lift supporting 500 lbs payload with safety and efficiency. 
+● Produced detailed 2D manufacturing drawings with GD&T annotations and full BOM using SolidWorks.- Selected 
+carbon fiber for structural components, achieving a lightweight yet durable design. 
+Autonomous Walking Rickshaw | Concurrent Engineering Course | Oct 2023 - Dec 2023 
+● Developed a Meccano-based autonomous walking vehicle, modeling all assemblies in SolidWorks. 
+● Reverse-engineered a drill motor for propulsion and authored a DFMEA report to mitigate design risks 
+● Simulated mechanical motion in SolidWorks to validate design feasibility and improve reliability.  
+Line-Follower Robot | Personal Project | Feb 2024 - Mar 2024 
+● Fabricated a chassis via 3D printing based on custom SolidWorks CAD models. 
+● Programmed LDR sensors and motor drivers in Arduino IDE to achieve precision line-following behavior. 
+● Integrated LiPo batteries and optimized the electronics layout for consistent, fault-free performance.  
+ 
+EXPERIENCE  
+Mechanical Engineering Intern | Dexlabs | Sept 2024 - Oct 2024 
+● Constructed and calibrated a 6-DOF robotic arm, achieving ±2 mm positional accuracy. 
+● Modeled and reverse-engineered components (e.g., modular gaming keyboard) using SolidWorks.- 
+● Collaborated with engineers to improve design reliability, creating detailed assembly documentation.  
+Customer Service Associate | Walmart Canada | Jul 2021 - Jan 2022 
+● Trained and mentored new associates, improving onboarding efficiency and team collaboration. 
+● Led customer returns, issue resolution, and service desk operations, often handling 20+ escalations daily. 
+● Streamlined problem-solving processes, reducing customer wait times by up to 30% 
+● Developed strong interpersonal and conflict resolution skills through direct customer interactions. 
+● Coordinated with cross-functional teams (cashiers, inventory staff) to enhance store operations and customer experience 
+ 

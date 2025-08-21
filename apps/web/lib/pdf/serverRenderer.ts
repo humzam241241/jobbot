@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer';
 import { createLogger } from '@/lib/logger';
 import { PDFGenerationError, withPdfErrorHandling, retryWithBackoff } from './errorHandling';
 
@@ -17,16 +17,9 @@ async function getBrowser() {
   if (!browserPromise) {
     browserPromise = (async () => {
       try {
-        // Try to use locally installed Chrome
         return puppeteer.launch({
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
-          executablePath: 
-            process.platform === 'win32'
-              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-              : process.platform === 'linux'
-              ? '/usr/bin/google-chrome'
-              : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          headless: 'new',
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
       } catch (error) {
         logger.error('Failed to launch browser', { error });
@@ -115,8 +108,11 @@ export async function generatePdfFromHtml(
     // Create a new page
     const page = await browser.newPage();
     
-    // Set content
-    await page.setContent(wrappedHtml, { waitUntil: 'networkidle0' });
+    // Set content with a longer timeout
+    await page.setContent(wrappedHtml, { 
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
     
     // Set PDF options
     const pdfOptions: puppeteer.PDFOptions = {
@@ -127,7 +123,8 @@ export async function generatePdfFromHtml(
         right: '0.5in',
         bottom: '0.5in',
         left: '0.5in'
-      }
+      },
+      timeout: 30000
     };
     
     // Generate PDF with retry
@@ -162,6 +159,9 @@ export async function generatePdfFromHtml(
         
         filePath = path.join(publicDir, fileName);
         fs.writeFileSync(filePath, pdfBuffer);
+        
+        // Make the path relative to public directory for URL access
+        filePath = `/resumes/${fileName}`;
       } catch (fsError: any) {
         throw new PDFGenerationError('Failed to save PDF to file system', {
           code: 'FILE_SYSTEM_ERROR',
