@@ -6,15 +6,12 @@ import { PDFGenerationError } from "@/lib/pdf/errorHandling";
 import { MasterResumeProps } from "@/components/resume/MasterResume";
 import { CoverLetterProps } from "@/components/resume/CoverLetter";
 import { ATSReportProps, KeywordMatch } from "@/components/resume/ATSReport";
+import { renderResume, renderCoverLetter, renderATSReport } from "@/components/resume/ServerComponents";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { logger } from "@/lib/logger";
 import fs from "fs";
 import path from "path";
-import MasterResume from "@/components/resume/MasterResume";
-import CoverLetter from "@/components/resume/CoverLetter";
-import ATSReport from "@/components/resume/ATSReport";
-import React from 'react';
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -385,9 +382,9 @@ export async function POST(req: NextRequest) {
       const fileNameBase = name.toLowerCase().replace(/\s+/g, '_');
       
       // Render components to HTML on the server
-      const resumeHtml = renderToStaticMarkup(React.createElement(MasterResume, resumeProps));
-      const coverLetterHtml = renderToStaticMarkup(React.createElement(CoverLetter, coverLetterProps));
-      const atsReportHtml = renderToStaticMarkup(React.createElement(ATSReport, atsReportProps));
+      const resumeHtml = await renderResume(resumeProps);
+      const coverLetterHtml = await renderCoverLetter(coverLetterProps);
+      const atsReportHtml = await renderATSReport(atsReportProps);
       
       // Generate PDFs from HTML
       resumePdfResult = await generatePdfFromHtml(resumeHtml, {
