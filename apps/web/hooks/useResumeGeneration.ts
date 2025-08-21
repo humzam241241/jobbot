@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { retryFetch, handleFetchError, AppError, isServer } from '@/lib/errorHandling';
 import { logger } from '@/lib/logger';
+import { useTokens } from './useTokens';
 
 // Create a browser-safe console logger as fallback
 const clientLogger = {
@@ -42,6 +43,7 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [result, setResult] = useState<ResumeGenerationResult | null>(null);
+  const { useToken, tokensRemaining, error: tokenError } = useTokens();
   
   const { onProgress, maxRetries = 3 } = options;
 
@@ -49,6 +51,18 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    
+    // Check if we have tokens available
+    if (tokensRemaining <= 0) {
+      setError({
+        code: 'TOKEN_LIMIT',
+        message: 'You have reached your daily generation limit. Please try again tomorrow.',
+        hint: 'The limit resets at midnight.',
+        status: 429
+      });
+      setIsLoading(false);
+      return null;
+    }
     
     // Use appropriate logger based on environment
     const log = isServer ? logger : clientLogger;
@@ -118,6 +132,9 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
       // Update progress
       onProgress?.('complete', 'Generation completed successfully');
       
+      // Deduct a token
+      await useToken();
+      
       // Set the result
       setResult({
         kitId: data.kitId,
@@ -160,8 +177,9 @@ export function useResumeGeneration(options: ResumeGenerationOptions = {}) {
   return {
     generateResume,
     isLoading,
-    error,
+    error: error || tokenError ? { ...error, tokenError } : null,
     result,
-    reset
+    reset,
+    tokensRemaining
   };
 }

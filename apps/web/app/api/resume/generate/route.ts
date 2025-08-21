@@ -382,11 +382,41 @@ Provide the enhanced ATS report as clean, well-structured HTML using proper sema
     try {
       // Generate tailored resume
       console.log(`[${new Date().toISOString()}] Generating tailored resume...`);
-      const resumeResult = await generateAny(provider, {
-        system: "You are an expert resume writer that creates ATS-optimized resumes tailored to job descriptions.",
-        user: tailoredResumePrompt,
-        model
-      });
+      
+      let resumeResult;
+      try {
+        resumeResult = await generateAny(provider, {
+          system: "You are an expert resume writer that creates ATS-optimized resumes tailored to job descriptions.",
+          user: tailoredResumePrompt,
+          model
+        });
+      } catch (providerError) {
+        logger.error(`Provider ${provider} with model ${model} failed`, { error: providerError });
+        
+        // Try with a different provider if the requested one fails
+        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
+        let succeeded = false;
+        
+        for (const fallbackProvider of fallbackProviders) {
+          if (fallbackProvider === provider) continue;
+          
+          try {
+            logger.info(`Trying fallback provider: ${fallbackProvider}`);
+            resumeResult = await generateAny(fallbackProvider, {
+              system: "You are an expert resume writer that creates ATS-optimized resumes tailored to job descriptions.",
+              user: tailoredResumePrompt
+            });
+            succeeded = true;
+            break;
+          } catch (fallbackError) {
+            logger.warn(`Fallback provider ${fallbackProvider} also failed`, { error: fallbackError });
+          }
+        }
+        
+        if (!succeeded) {
+          throw new Error(`All AI providers failed. Please try again later.`);
+        }
+      }
       // Ensure we have valid HTML by sanitizing the AI response
       const sanitizeHtml = (html: string): string => {
         // Check if the response already has HTML tags
@@ -402,20 +432,80 @@ Provide the enhanced ATS report as clean, well-structured HTML using proper sema
       
       // Generate cover letter
       console.log(`[${new Date().toISOString()}] Generating cover letter...`);
-      const coverLetterResult = await generateAny(provider, {
-        system: "You are an expert cover letter writer with a warm, professional tone.",
-        user: coverLetterPrompt,
-        model
-      });
+      
+      let coverLetterResult;
+      try {
+        coverLetterResult = await generateAny(provider, {
+          system: "You are an expert cover letter writer with a warm, professional tone.",
+          user: coverLetterPrompt,
+          model
+        });
+      } catch (providerError) {
+        logger.error(`Provider ${provider} with model ${model} failed for cover letter`, { error: providerError });
+        
+        // Try with a different provider if the requested one fails
+        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
+        let succeeded = false;
+        
+        for (const fallbackProvider of fallbackProviders) {
+          if (fallbackProvider === provider) continue;
+          
+          try {
+            logger.info(`Trying fallback provider for cover letter: ${fallbackProvider}`);
+            coverLetterResult = await generateAny(fallbackProvider, {
+              system: "You are an expert cover letter writer with a warm, professional tone.",
+              user: coverLetterPrompt
+            });
+            succeeded = true;
+            break;
+          } catch (fallbackError) {
+            logger.warn(`Fallback provider ${fallbackProvider} also failed for cover letter`, { error: fallbackError });
+          }
+        }
+        
+        if (!succeeded) {
+          throw new Error(`All AI providers failed for cover letter. Please try again later.`);
+        }
+      }
       coverLetterHtml = sanitizeHtml(coverLetterResult.text);
       
       // Generate ATS report
       console.log(`[${new Date().toISOString()}] Generating ATS report...`);
-      const atsReportResult = await generateAny(provider, {
-        system: "You are an expert ATS (Applicant Tracking System) analyst.",
-        user: atsReportPrompt,
-        model
-      });
+      
+      let atsReportResult;
+      try {
+        atsReportResult = await generateAny(provider, {
+          system: "You are an expert ATS (Applicant Tracking System) analyst.",
+          user: atsReportPrompt,
+          model
+        });
+      } catch (providerError) {
+        logger.error(`Provider ${provider} with model ${model} failed for ATS report`, { error: providerError });
+        
+        // Try with a different provider if the requested one fails
+        const fallbackProviders = ['openai', 'anthropic', 'openrouter'];
+        let succeeded = false;
+        
+        for (const fallbackProvider of fallbackProviders) {
+          if (fallbackProvider === provider) continue;
+          
+          try {
+            logger.info(`Trying fallback provider for ATS report: ${fallbackProvider}`);
+            atsReportResult = await generateAny(fallbackProvider, {
+              system: "You are an expert ATS (Applicant Tracking System) analyst.",
+              user: atsReportPrompt
+            });
+            succeeded = true;
+            break;
+          } catch (fallbackError) {
+            logger.warn(`Fallback provider ${fallbackProvider} also failed for ATS report`, { error: fallbackError });
+          }
+        }
+        
+        if (!succeeded) {
+          throw new Error(`All AI providers failed for ATS report. Please try again later.`);
+        }
+      }
       atsReportHtml = sanitizeHtml(atsReportResult.text);
       
       console.log(`[${new Date().toISOString()}] All content generated successfully`);
@@ -547,22 +637,66 @@ Provide the enhanced ATS report as clean, well-structured HTML using proper sema
 
     const jobId = `gen_${Date.now()}`;
     
-    // Generate actual PDF buffers
-    const resumePdfBuffer = await renderPdf(resumeHtml, { 
-      title: "Tailored Resume", 
-      size: "Letter",
-      engine: "direct"  // Use the direct PDF generator
-    });
-    const coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
-      title: "Cover Letter", 
-      size: "Letter",
-      engine: "direct"  // Use the direct PDF generator
-    });
-    const atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
-      title: "ATS Report", 
-      size: "Letter",
-      engine: "direct"  // Use the direct PDF generator
-    });
+    // Generate actual PDF buffers - try multiple methods in sequence
+    let resumePdfBuffer, coverLetterPdfBuffer, atsReportPdfBuffer;
+    
+    try {
+      // First try server-side rendering with puppeteer-core
+      logger.info('Generating PDFs with server-side rendering');
+      resumePdfBuffer = await renderPdf(resumeHtml, { 
+        title: "Tailored Resume", 
+        size: "Letter",
+        engine: "server"
+      });
+      coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
+        title: "Cover Letter", 
+        size: "Letter",
+        engine: "server"
+      });
+      atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
+        title: "ATS Report", 
+        size: "Letter",
+        engine: "server"
+      });
+    } catch (serverError) {
+      logger.warn('Server-side PDF generation failed, trying direct method', { error: serverError });
+      try {
+        // Try direct rendering with html-pdf-node
+        resumePdfBuffer = await renderPdf(resumeHtml, { 
+          title: "Tailored Resume", 
+          size: "Letter",
+          engine: "direct"
+        });
+        coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
+          title: "Cover Letter", 
+          size: "Letter",
+          engine: "direct"
+        });
+        atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
+          title: "ATS Report", 
+          size: "Letter",
+          engine: "direct"
+        });
+      } catch (directError) {
+        logger.warn('Direct PDF generation failed, using puppeteer', { error: directError });
+        // Fall back to puppeteer
+        resumePdfBuffer = await renderPdf(resumeHtml, { 
+          title: "Tailored Resume", 
+          size: "Letter",
+          engine: "puppeteer"
+        });
+        coverLetterPdfBuffer = await renderPdf(coverLetterHtml, { 
+          title: "Cover Letter", 
+          size: "Letter",
+          engine: "puppeteer"
+        });
+        atsReportPdfBuffer = await renderPdf(atsReportHtml, { 
+          title: "ATS Report", 
+          size: "Letter",
+          engine: "puppeteer"
+        });
+      }
+    }
     
     return NextResponse.json({
       ok: true,

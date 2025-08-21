@@ -3,6 +3,7 @@ import { wrapForPrint } from "./sanitize";
 import { createLogger } from "@/lib/logger";
 import { puppeteerHtmlToPdf, generateSimplePdf } from "./puppeteerRenderer";
 import { generateDirectPdf } from "./directPdf";
+import { generateServerPdf } from "./serverPdf";
 
 const logger = createLogger('pdf-renderer');
 
@@ -102,7 +103,7 @@ export async function renderPdf(
   options: { 
     title?: string; 
     size?: "Letter"|"A4";
-    engine?: "direct" | "playwright" | "puppeteer";
+    engine?: "server" | "direct" | "playwright" | "puppeteer" | "client";
   } = {}
 ): Promise<Buffer> {
   // Validate input
@@ -112,67 +113,114 @@ export async function renderPdf(
   }
   
   try {
-    // Use the direct PDF generator by default
-    const engine = options.engine || 'direct';
+    // Use the server PDF generator by default
+    const engine = options.engine || 'server';
     logger.info(`Generating PDF using ${engine} engine`);
     
-    if (engine === 'direct') {
-      // Use the most reliable method first
-      return await generateDirectPdf(html, options);
-    }
-    
-    // Add default styling for other engines
-    const styledHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${options.title || "Document"}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0.5in;
-              line-height: 1.5;
-              color: #000;
-              background: #fff;
-            }
-            h1 { 
-              color: #2563eb;
-              margin-bottom: 1em;
-              font-size: 24pt;
-            }
-            h2 {
-              color: #1e40af;
-              margin-top: 1em;
-              margin-bottom: 0.5em;
-              font-size: 18pt;
-            }
-            p { margin: 0.5em 0; }
-            ul { margin: 0.5em 0; padding-left: 1.5em; }
-            li { margin: 0.25em 0; }
-            .section { margin: 1em 0; }
-            .experience-header { font-weight: bold; }
-            .experience-subtitle { font-style: italic; color: #4a5568; }
-          </style>
-        </head>
-        <body>
-          ${html}
-        </body>
-      </html>
-    `;
-    
-    // Try other engines if specified
+    // Try the requested engine
     try {
-      if (engine === 'puppeteer') {
+      if (engine === 'server') {
+        // Use our most reliable server-side method first
+        return await generateServerPdf(html, options);
+      } else if (engine === 'direct') {
+        return await generateDirectPdf(html, options);
+      } else if (engine === 'puppeteer') {
+        // Add default styling for other engines
+        const styledHtml = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${options.title || "Document"}</title>
+              <style>
+                body { 
+                  font-family: Arial, sans-serif; 
+                  margin: 0.5in;
+                  line-height: 1.5;
+                  color: #000;
+                  background: #fff;
+                }
+                h1 { 
+                  color: #2563eb;
+                  margin-bottom: 1em;
+                  font-size: 24pt;
+                }
+                h2 {
+                  color: #1e40af;
+                  margin-top: 1em;
+                  margin-bottom: 0.5em;
+                  font-size: 18pt;
+                }
+                p { margin: 0.5em 0; }
+                ul { margin: 0.5em 0; padding-left: 1.5em; }
+                li { margin: 0.25em 0; }
+                .section { margin: 1em 0; }
+                .experience-header { font-weight: bold; }
+                .experience-subtitle { font-style: italic; color: #4a5568; }
+              </style>
+            </head>
+            <body>
+              ${html}
+            </body>
+          </html>
+        `;
         return await puppeteerHtmlToPdf(styledHtml, options);
       } else if (engine === 'playwright') {
+        const styledHtml = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${options.title || "Document"}</title>
+              <style>
+                body { 
+                  font-family: Arial, sans-serif; 
+                  margin: 0.5in;
+                  line-height: 1.5;
+                  color: #000;
+                  background: #fff;
+                }
+                h1 { color: #2563eb; }
+                h2 { color: #1e40af; }
+              </style>
+            </head>
+            <body>
+              ${html}
+            </body>
+          </html>
+        `;
         return await playwrightHtmlToPdf(styledHtml, options);
+      } else if (engine === 'client') {
+        // Client-side rendering is handled differently - just return HTML as buffer
+        // The client will convert it to PDF
+        const styledHtml = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${options.title || "Document"}</title>
+              <meta name="pdf-engine" content="client">
+            </head>
+            <body>
+              ${html}
+            </body>
+          </html>
+        `;
+        return Buffer.from(styledHtml);
       } else {
-        // Fallback to direct if unknown engine
-        return await generateDirectPdf(html, options);
+        // Fallback to server if unknown engine
+        return await generateServerPdf(html, options);
       }
     } catch (engineError) {
-      logger.warn(`${engine} PDF generation failed, falling back to direct method`, { error: engineError });
-      return await generateDirectPdf(html, options);
+      logger.warn(`${engine} PDF generation failed, trying server method`, { error: engineError });
+      try {
+        return await generateServerPdf(html, options);
+      } catch (serverError) {
+        logger.warn('Server PDF generation failed, trying direct method', { error: serverError });
+        try {
+          return await generateDirectPdf(html, options);
+        } catch (directError) {
+          logger.warn('Direct PDF generation failed, using simple PDF', { error: directError });
+          throw directError;
+        }
+      }
     }
   } catch (error) {
     logger.error('All PDF rendering methods failed', { error });
@@ -184,7 +232,7 @@ export async function renderPdf(
       Error details: ${error.message}
       
       Original content:
-      ${html}
+      ${html.substring(0, 500)}...
     `, `${options.title || "Document"} (Error)`);
   }
 }
