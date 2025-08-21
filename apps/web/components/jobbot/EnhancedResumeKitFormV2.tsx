@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { GenerationStep } from '@/lib/types/resume';
 import GenerationStepper from '@/components/ui/GenerationStepper';
-import { DocumentArrowUpIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { DocumentArrowUpIcon, XMarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import PDFPreview from './PDFPreview';
 import { useLocalStorage } from "react-use";
 import { useTokens } from "@/hooks/useTokens";

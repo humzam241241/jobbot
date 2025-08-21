@@ -37,9 +37,11 @@ export default function TopNav() {
         const generationCount = localStorage.getItem('jobbot-generation-count');
         const usedTokens = generationCount ? parseInt(generationCount, 10) : 0;
         
-        // Read remaining tokens
-        const remainingTokens = localStorage.getItem('jobbot-tokens-remaining');
-        const tokensLeft = remainingTokens ? parseInt(remainingTokens, 10) : MAX_GENERATIONS;
+        // Calculate remaining tokens based on generation count
+        const tokensLeft = MAX_GENERATIONS - usedTokens;
+        
+        // Update localStorage to ensure consistency
+        localStorage.setItem('jobbot-tokens-remaining', tokensLeft.toString());
         
         setTokenStats({
           total: MAX_GENERATIONS,

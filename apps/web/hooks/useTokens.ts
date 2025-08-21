@@ -9,24 +9,18 @@ export function useTokens() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset tokens at midnight
+  // No longer resetting tokens daily - tokens are based purely on usage count
   useEffect(() => {
-    const checkDate = () => {
-      const lastResetDate = localStorage.getItem('jobbot-last-reset-date');
-      const today = new Date().toDateString();
-      
-      if (lastResetDate !== today) {
-        setTokensRemaining(MAX_TOKENS);
-        localStorage.setItem('jobbot-last-reset-date', today);
-      }
-    };
-
-    checkDate(); // Check on mount
+    // Initialize tokens if not already set
+    const generationCount = localStorage.getItem('jobbot-generation-count');
+    const usedTokens = generationCount ? parseInt(generationCount, 10) : 0;
+    const remainingTokens = MAX_TOKENS - usedTokens;
     
-    // Check every minute
-    const interval = setInterval(checkDate, 60000);
-    return () => clearInterval(interval);
-  }, [setTokensRemaining]);
+    if (remainingTokens !== tokensRemaining) {
+      setTokensRemaining(remainingTokens);
+      localStorage.setItem(TOKEN_STORAGE_KEY, remainingTokens.toString());
+    }
+  }, [tokensRemaining, setTokensRemaining]);
 
   const useToken = async () => {
     setIsLoading(true);
