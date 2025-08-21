@@ -4,6 +4,7 @@ import { GenerationStep } from '@/lib/types/resume';
 import GenerationStepper from '@/components/ui/GenerationStepper';
 import { DocumentArrowUpIcon, DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useLocalStorage } from "react-use";
+import { useTokens } from "@/hooks/useTokens";
 import JobDescriptionFallback from '@/components/JobDescriptionFallback';
 import { useResumeGeneration } from '@/hooks/useResumeGeneration';
 import { formatErrorMessage, getErrorSuggestion, getErrorTrackingInfo } from '@/lib/errorHandling';
@@ -207,9 +208,18 @@ export default function EnhancedResumeKitFormV2() {
     reset();
   };
 
+  // Use token system
+  const { tokensRemaining, useToken, error: tokenError } = useTokens();
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if we have tokens available
+    const canUseToken = await useToken();
+    if (!canUseToken) {
+      return;
+    }
 
     // Reset steps
     setSteps(GENERATION_STEPS.map(step => ({ ...step, status: 'pending' })));
@@ -469,13 +479,35 @@ export default function EnhancedResumeKitFormV2() {
             </div>
           </div>
 
-          {/* Generation Count */}
-          {generationCount !== null && generationCount > 0 && (
-            <div className="text-xs text-gray-500 text-right flex items-center justify-end gap-1">
+          {/* Token and Generation Count */}
+          <div className="flex justify-between items-center text-xs">
+            <div className="text-blue-600 flex items-center gap-1">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              You've generated {generationCount} resume kit{generationCount !== 1 ? 's' : ''}
+              {tokensRemaining} token{tokensRemaining !== 1 ? 's' : ''} remaining today
+            </div>
+            
+            {generationCount !== null && generationCount > 0 && (
+              <div className="text-gray-500 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                {generationCount} resume kit{generationCount !== 1 ? 's' : ''} generated
+              </div>
+            )}
+          </div>
+
+          {/* Token Error */}
+          {tokenError && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {tokenError}
+              </div>
             </div>
           )}
 

@@ -111,32 +111,73 @@ export async function renderPdf(
   }
   
   try {
-    // Just return HTML directly for now to ensure something works
-    // This will at least show content to the user
-    logger.info('Returning HTML directly as fallback');
-    return generateSimplePdf(html, options.title || 'Document');
-  } catch (error) {
-    logger.error('PDF rendering failed', { error });
-    
-    // Last resort: return a text buffer with error info
-    return Buffer.from(`
+    // Add default styling to ensure content is visible
+    const styledHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <title>${options.title || "Document"}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 2cm; }
-            h1 { color: #e53e3e; }
-            pre { white-space: pre-wrap; }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0.5in;
+              line-height: 1.5;
+              color: #000;
+              background: #fff;
+            }
+            h1 { 
+              color: #2563eb;
+              margin-bottom: 1em;
+              font-size: 24pt;
+            }
+            h2 {
+              color: #1e40af;
+              margin-top: 1em;
+              margin-bottom: 0.5em;
+              font-size: 18pt;
+            }
+            p { margin: 0.5em 0; }
+            ul { margin: 0.5em 0; padding-left: 1.5em; }
+            li { margin: 0.25em 0; }
+            .section { margin: 1em 0; }
+            .experience-header { font-weight: bold; }
+            .experience-subtitle { font-style: italic; color: #4a5568; }
           </style>
         </head>
         <body>
-          <h1>PDF Generation Error</h1>
-          <p>There was an error generating the PDF.</p>
-          <pre>${html}</pre>
+          ${html}
         </body>
       </html>
-    `);
+    `;
+    
+    // Try to generate PDF
+    try {
+      logger.info('Generating PDF with Puppeteer');
+      return await puppeteerHtmlToPdf(styledHtml, options);
+    } catch (puppeteerError) {
+      logger.warn('Puppeteer PDF generation failed, falling back to Playwright', { error: puppeteerError });
+      try {
+        return await playwrightHtmlToPdf(styledHtml, options);
+      } catch (playwrightError) {
+        logger.error('All PDF generation attempts failed', { 
+          puppeteerError,
+          playwrightError
+        });
+        throw playwrightError;
+      }
+    }
+  } catch (error) {
+    logger.error('PDF rendering failed', { error });
+    
+    // Return a simple error PDF
+    return generateSimplePdf(`
+      Error generating PDF. Please try again.
+      
+      Error details: ${error.message}
+      
+      Original content:
+      ${html}
+    `, `${options.title || "Document"} (Error)`);
   }
 }
 
