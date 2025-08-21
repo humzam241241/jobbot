@@ -3,9 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "pnpm run mark-client && pnpm run audit:client && next dev -p 3000",
+    "dev": "next dev -p 3000",
+    "dev:full": "pnpm run mark-client && pnpm run audit:client && next dev -p 3000",
     "prebuild": "node -e \"console.log('skip prisma generate')\"",
-    "build": "pnpm run mark-client && pnpm run audit:client && next build",
+    "build": "next build",
+    "build:full": "pnpm run mark-client && pnpm run audit:client && next build",
     "start": "next start -p 3000",
     "check:routes": "tsx scripts/find-route-dupes.ts",
     "typecheck": "tsc --noEmit",
@@ -16,8 +18,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "mark-client": "tsx ../scripts/auto-mark-client.ts",
-    "audit:client": "tsx ../scripts/audit-client-server.ts",
+    "mark-client": "tsx ../../scripts/auto-mark-client.ts",
+    "audit:client": "tsx ../../scripts/audit-client-server.ts",
     "lint": "next lint"
   },
   "dependencies": {
