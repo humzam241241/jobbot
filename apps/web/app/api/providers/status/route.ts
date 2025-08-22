@@ -21,11 +21,11 @@ export async function GET(req: NextRequest) {
         available: env.hasAnthropic,
         models: providers.anthropic.models
       },
-      gemini: {
-        available: env.hasGemini,
+      google: {
+        available: env.hasGoogle,
         models: providers.gemini.models
       }
     },
-    anyProviderAvailable: env.hasOpenAI || env.hasAnthropic || env.hasGemini
+    anyProviderAvailable: env.hasOpenAI || env.hasAnthropic || env.hasGoogle
   });
 }

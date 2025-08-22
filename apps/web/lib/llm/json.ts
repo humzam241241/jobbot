@@ -4,7 +4,19 @@ import { jsonrepair } from "jsonrepair";
 import type { JSONSchema7 } from 'json-schema';
 import { env } from "../env";
 
-type JsonResult<T> = { json: T; raw: string; provider: string; model: string };
+type TokenUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedTokens?: number;
+};
+
+type JsonResult<T> = { 
+  json: T; 
+  raw: string; 
+  provider: string; 
+  model: string;
+  tokenUsage?: TokenUsage;
+};
 
 /**
  * Extracts the largest JSON object from a text string
@@ -72,7 +84,17 @@ export async function callJSON<T>(
         response_format: { type: 'json_object' },
         messages: [sys, ...messages],
       });
-      return res.choices[0]?.message?.content ?? '';
+      // Extract token usage information
+      const tokenUsage = {
+        inputTokens: res.usage?.prompt_tokens,
+        outputTokens: res.usage?.completion_tokens,
+        estimatedTokens: res.usage?.total_tokens
+      };
+      
+      return {
+        text: res.choices[0]?.message?.content ?? '',
+        tokenUsage
+      };
     } else if (provider === 'anthropic') {
       // ANTHROPIC
       const { Anthropic } = await import("@anthropic-ai/sdk");
@@ -114,7 +136,13 @@ export async function callJSON<T>(
           }
 
           // Fallback to text content if no tool call
-          return response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const text = response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const tokenUsage = {
+            inputTokens: response.usage?.input_tokens,
+            outputTokens: response.usage?.output_tokens,
+            estimatedTokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
+          };
+          return { text, tokenUsage };
         }
         
         // Fallback to JSON response format for other Claude 3 models
@@ -130,7 +158,13 @@ export async function callJSON<T>(
             }
           });
 
-          return response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const text = response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const tokenUsage = {
+            inputTokens: response.usage?.input_tokens,
+            outputTokens: response.usage?.output_tokens,
+            estimatedTokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
+          };
+          return { text, tokenUsage };
         } 
         
         // Fallback for older models that don't support JSON schema
@@ -156,7 +190,13 @@ export async function callJSON<T>(
             temperature
           });
 
-          return response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const text = response.content.filter(c => c.type === 'text').map(c => c.text).join('');
+          const tokenUsage = {
+            inputTokens: response.usage?.input_tokens,
+            outputTokens: response.usage?.output_tokens,
+            estimatedTokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
+          };
+          return { text, tokenUsage };
         }
         
         throw error;
@@ -192,7 +232,13 @@ export async function callJSON<T>(
           }
         });
 
-        return response.response.text();
+        const text = response.response.text();
+      const tokenUsage = {
+        inputTokens: response.response.usageMetadata?.promptTokenCount,
+        outputTokens: response.response.usageMetadata?.candidatesTokenCount,
+        estimatedTokens: response.response.usageMetadata?.totalTokenCount || Math.ceil(text.length / 4)
+      };
+      return { text, tokenUsage };
       } catch (error) {
         // If there's an error with responseMimeType, try again without it
         if (String(error).includes("responseMimeType") || String(error).includes("mime")) {
@@ -210,7 +256,13 @@ export async function callJSON<T>(
                 }
               });
               
-              return response.response.text();
+              const text = response.response.text();
+      const tokenUsage = {
+        inputTokens: response.response.usageMetadata?.promptTokenCount,
+        outputTokens: response.response.usageMetadata?.candidatesTokenCount,
+        estimatedTokens: response.response.usageMetadata?.totalTokenCount || Math.ceil(text.length / 4)
+      };
+      return { text, tokenUsage };
             }
           } catch (schemaError) {
             console.warn("Gemini API error with responseSchema, falling back to basic approach");
@@ -225,7 +277,13 @@ export async function callJSON<T>(
             }
           });
 
-          return response.response.text();
+          const text = response.response.text();
+      const tokenUsage = {
+        inputTokens: response.response.usageMetadata?.promptTokenCount,
+        outputTokens: response.response.usageMetadata?.candidatesTokenCount,
+        estimatedTokens: response.response.usageMetadata?.totalTokenCount || Math.ceil(text.length / 4)
+      };
+      return { text, tokenUsage };
         }
         
         throw error;
@@ -234,14 +292,24 @@ export async function callJSON<T>(
   };
 
   let lastRaw = '';
+  let lastTokenUsage: TokenUsage | undefined;
+  
   for (let i = 0; i < 3; i++) {
     try {
-      lastRaw = await attempt();
+      const result = await attempt();
+      lastRaw = result.text;
+      lastTokenUsage = result.tokenUsage;
       const body = extractLargestJsonObject(lastRaw).trim();
       try {
         const obj = JSON.parse(body);
         // TODO: validate against schema here if you have a validator
-        return { json: obj as T, raw: lastRaw, provider, model };
+        return { 
+          json: obj as T, 
+          raw: lastRaw, 
+          provider, 
+          model,
+          tokenUsage: lastTokenUsage
+        };
       } catch(e) {
         if (i < 2) { // Only log for retries, not the final attempt
           console.warn(`JSON parse failed (attempt ${i+1}/3), retrying...`);

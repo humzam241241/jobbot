@@ -13,7 +13,7 @@ export class GoogleProvider implements Provider {
   constructor() {
     const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
     this.baseUrl = process.env.GOOGLE_GENAI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
-    this.defaultModel = 'gemini-1.5-pro'; // Default to Gemini 1.5 Pro
+    this.defaultModel = 'gemini-2.5-pro'; // Default to Gemini 2.5 Pro
 
     if (apiKey) {
       try {
@@ -56,22 +56,65 @@ export class GoogleProvider implements Provider {
       
       const geminiModel = this.client!.getGenerativeModel({ model });
       
-      const response = await geminiModel.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [
+      // Attempt to use the most robust JSON generation method available
+      let response;
+      try {
+        // Try with responseSchema (Gemini 2.5+ feature)
+        if (model.includes('gemini-2.5')) {
+          response = await geminiModel.generateContent({
+            contents: [
               {
-                text: `${input.prompt}\n\nRespond with valid JSON that matches this schema: ${input.schema.description || JSON.stringify(input.schema._def)}`,
+                role: 'user',
+                parts: [
+                  {
+                    text: `${input.prompt}\n\nRespond with valid JSON that matches the provided schema.`,
+                  }
+                ]
               }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature,
-          responseFormat: { type: 'json_object' },
-        },
-      }, { signal: controller.signal as any });
+            ],
+            generationConfig: {
+              temperature,
+              responseSchema: typeof input.schema._def === 'object' ? input.schema._def : undefined,
+            },
+          }, { signal: controller.signal as any });
+        } else {
+          // Fall back to responseFormat for older models
+          response = await geminiModel.generateContent({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    text: `${input.prompt}\n\nRespond with valid JSON that matches this schema: ${input.schema.description || JSON.stringify(input.schema._def)}`,
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature,
+              responseMimeType: "application/json",
+            },
+          }, { signal: controller.signal as any });
+        }
+      } catch (genError) {
+        // If schema or mime type features fail, fall back to basic prompt
+        logger.warn('Advanced JSON features failed, falling back to basic prompt', { error: genError });
+        response = await geminiModel.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: `${input.prompt}\n\nIMPORTANT: Respond with ONLY a valid JSON object. No markdown, no code fences, no commentary.\nSchema: ${input.schema.description || JSON.stringify(input.schema._def)}`,
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature,
+          },
+        }, { signal: controller.signal as any });
+      }
       
       // Clear timeout
       clearTimeout(timeoutId);
@@ -95,10 +138,25 @@ export class GoogleProvider implements Provider {
       try {
         const validatedJson = input.schema.parse(jsonResult);
         
+        // Get token usage if available, or estimate based on text length
+        let tokensUsed = response.response.usageMetadata?.totalTokens;
+        
+        if (!tokensUsed) {
+          // Estimate tokens based on text length (rough approximation)
+          const promptText = input.prompt || '';
+          const responseText = content || '';
+          const totalChars = promptText.length + responseText.length;
+          tokensUsed = Math.ceil(totalChars / 4); // ~4 chars per token
+        }
+        
         return {
           json: validatedJson,
           raw: response,
-          tokensUsed: response.response.usageMetadata?.totalTokens,
+          tokensUsed,
+          tokenUsage: {
+            inputTokens: Math.ceil(tokensUsed * 0.4), // Rough estimate: 40% input, 60% output
+            outputTokens: Math.ceil(tokensUsed * 0.6),
+          }
         };
       } catch (validationError) {
         logger.error('Schema validation failed for Google response', { error: validationError, json: jsonResult });

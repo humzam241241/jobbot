@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import FileUpload from "@/components/ui/FileUpload";
 import ErrorCard from "@/components/ui/ErrorCard";
 import ModelSelector from "@/components/ui/ModelSelector";
+import UsagePill from "@/components/ui/UsagePill";
 import { createDevLogger } from "@/lib/utils/devLogger";
 
 const logger = createDevLogger("ui:resumeKitForm");
@@ -21,7 +22,7 @@ interface GenerationResult {
   score?: number;
 }
 
-type Provider = 'openai' | 'anthropic' | 'gemini' | 'auto';
+type Provider = 'openai' | 'anthropic' | 'google' | 'auto';
 
 export default function EnhancedResumeKitForm() {
   const [result, setResult] = useState<GenerationResult | null>(null);
@@ -42,6 +43,7 @@ export default function EnhancedResumeKitForm() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"error" | "success" | "info">("error");
+  const [usageData, setUsageData] = useState<any>(null);
 
   // Handle model selection change
   const handleModelChange = (provider: Provider, model: string) => {
@@ -89,6 +91,11 @@ export default function EnhancedResumeKitForm() {
         if (json.ok) {
           // Success response
           setResult(json);
+          
+          // Update usage data
+          if (json.usage) {
+            setUsageData(json.usage);
+          }
           
           // Show success toast
           setToastMessage("Resume kit generated successfully!");
@@ -145,7 +152,7 @@ export default function EnhancedResumeKitForm() {
     if (currentProvider.includes("openai") || currentProvider.includes("gpt")) {
       handleModelChange("anthropic", "claude-3-5-sonnet-latest");
     } else if (currentProvider.includes("anthropic") || currentProvider.includes("claude")) {
-      handleModelChange("gemini", "gemini-2.5-pro");
+      handleModelChange("google", "gemini-2.5-pro");
     } else {
       handleModelChange("openai", "gpt-4o-2024-05-13");
     }
@@ -255,13 +262,17 @@ export default function EnhancedResumeKitForm() {
         />
       )}
 
-      <button 
-        type="submit" 
-        disabled={isLoading}
-        className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
-      >
-        {isLoading ? "Generating Resume Kit..." : "Generate Resume Kit"}
-      </button>
+      <div className="flex justify-between items-center">
+        <button 
+          type="submit" 
+          disabled={isLoading}
+          className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+        >
+          {isLoading ? "Generating Resume Kit..." : "Generate Resume Kit"}
+        </button>
+        
+        {usageData && <UsagePill initialUsage={usageData} className="ml-4" />}
+      </div>
 
       {/* Results */}
       {result?.ok && (

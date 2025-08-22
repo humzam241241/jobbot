@@ -1,24 +1,30 @@
 {
   "name": "resume-bot",
-  "private": true,
   "version": "0.1.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "packageManager": "pnpm@9.7.0",
+  "private": true,
   "scripts": {
     "dev": "pnpm --filter @app/web dev || pnpm --filter web dev || next dev",
-    "build": "pnpm -r build || next build",
-    "lint": "pnpm -r lint || eslint .",
-    "test": "pnpm -r test || vitest"
+    "build": "pnpm --filter @app/web build || pnpm --filter web build || next build",
+    "start": "pnpm --filter @app/web start || pnpm --filter web start || next start",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "typecheck": "tsc -b --pretty false",
+    "clean": "rimraf ./**/node_modules/.cache",
+    "test": "pnpm --filter @app/web test"
   },
   "dependencies": {
-    "@types/jest": "^30.0.0",
-    "jest": "^30.0.5",
-    "mammoth": "^1.10.0",
-    "pdf-parse": "^1.1.1",
-    "ts-jest": "^29.4.1",
-    "zod": "^4.0.17"
+    "@google/generative-ai": "^0.2.1",
+    "next": "^14.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.47",
+    "@types/react-dom": "^18.2.18",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.2.5",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3"
   }
 }

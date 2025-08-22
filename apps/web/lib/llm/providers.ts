@@ -1,7 +1,7 @@
 // apps/web/lib/llm/providers.ts
 import { env } from '../env';
 
-export type LlmProvider = 'openai' | 'anthropic' | 'gemini';
+export type LlmProvider = 'openai' | 'anthropic' | 'google';
 
 export type ProviderRequest = { 
   requested?: { provider?: LlmProvider; model?: string }, 
@@ -14,16 +14,16 @@ export function resolveProvider(req: ProviderRequest): ResolvedProvider {
   const has = {
     openai: !!env.OPENAI_API_KEY,
     anthropic: !!env.ANTHROPIC_API_KEY,
-    gemini: !!env.GEMINI_API_KEY,
+    google: !!env.GOOGLE_API_KEY,
   };
   
   const order: ResolvedProvider[] = [
     { provider: 'openai', model: 'gpt-4o-2024-05-13' },
     { provider: 'anthropic', model: 'claude-3-5-sonnet-latest' },
-    { provider: 'gemini', model: 'gemini-2.5-pro' },
+    { provider: 'google', model: 'gemini-2.5-pro' },
   ];
   
-  const isUsable = (p: LlmProvider) => p === 'openai' ? has.openai : p === 'anthropic' ? has.anthropic : has.gemini;
+  const isUsable = (p: LlmProvider) => p === 'openai' ? has.openai : p === 'anthropic' ? has.anthropic : has.google;
 
   const rp = req.requested?.provider, rm = req.requested?.model;
   if (rp && isUsable(rp)) return { provider: rp, model: rm || order.find(o => o.provider === rp)!.model };
@@ -65,8 +65,8 @@ export function getAvailableProviders() {
       ] : []
     },
     gemini: {
-      available: env.hasGemini,
-      models: env.hasGemini ? [
+      available: env.hasGoogle,
+      models: env.hasGoogle ? [
         'gemini-2.5-pro',
         'gemini-2.5-flash',
         'gemini-1.5-pro-latest',

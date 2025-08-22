@@ -1,4 +1,4 @@
-# JobBot - AI-Powered Resume Tailoring and Job Application Assistant
+# JobBot - AI-Powered Resume Tailoring
 
 JobBot is a full-stack application that helps job seekers optimize their resumes and cover letters for specific job postings using AI. The application analyzes both the user's resume and the target job description to create tailored, ATS-optimized documents.
 
@@ -6,115 +6,154 @@ JobBot is a full-stack application that helps job seekers optimize their resumes
 
 - **Resume Tailoring**: Upload your resume and job description to generate a tailored, ATS-optimized resume
 - **Cover Letter Generation**: Automatically create personalized cover letters based on your resume and job description
-- **ATS Compatibility Reports**: Get insights on how well your resume matches the job requirements
-- **File Management**: Organize and track your generated documents
-- **Job Application Tracking**: Keep track of your job applications
 - **Multiple AI Providers**: Support for OpenAI, Anthropic, and Google AI models
+- **Format Preservation**: Maintains your original resume structure and formatting
+- **Usage Tracking**: Monitor your token usage and generation counts
 
 ## Tech Stack
 
 - **Frontend**: Next.js (App Router), React, Tailwind CSS
 - **Backend**: Next.js API Routes, Zod for validation
-- **Authentication**: NextAuth.js with Google OAuth
 - **Database**: PostgreSQL with Prisma ORM
-- **PDF Generation**: Playwright for HTML to PDF conversion
 - **AI Integration**: Multiple provider adapters (OpenAI, Anthropic, Google)
-- **Testing**: Vitest for unit and integration tests
 
-## Prerequisites
+## Getting Started
 
-- **Node.js**: v18.20.3 or later (check `.nvmrc`)
-- **PNPM**: v9.7.0 or later (package manager)
-- **PostgreSQL**: For user data and application tracking
+### Prerequisites
 
-## Quickstart
+- Node.js v18 or later
+- PNPM package manager
+- PostgreSQL database
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/resume-bot.git
-   cd resume-bot
+### All-in-One Setup Menu
+
+For the easiest experience, run the all-in-one menu:
+```bash
+jobbot-all-in-one.bat
+```
+
+This interactive menu provides access to all setup and maintenance options:
+1. Quick Setup and Start
+2. Fix Database Connection
+3. Clean Repository
+4. Update Dependencies
+5. Start JobBot
+
+### Individual Scripts
+
+You can also run individual scripts directly:
+
+- **jobbot-setup.bat** - Complete setup (environment, dependencies, database)
+- **fix-database.bat** - Fixes database connection issues
+- **cleanup-repo.bat** - Cleans up redundant files and caches
+- **update-deps.bat** - Updates dependencies to their latest versions
+- **start-jobbot.bat** - Starts the application without setup
+
+### Manual Setup
+
+1. Create a `.env.local` file in `apps/web/` with:
+   ```
+   DATABASE_URL="postgres://postgres:postgres@localhost:5432/jobbot"
+   NEXTAUTH_URL="http://localhost:3000"
+   NEXTAUTH_SECRET="your-secret-key"
+   OPENAI_API_KEY="your-openai-key"
+   ANTHROPIC_API_KEY="your-anthropic-key"
+   GOOGLE_API_KEY="your-google-key"
    ```
 
 2. Install dependencies:
    ```bash
    pnpm install
+   pnpm add -w @google/generative-ai
    ```
 
-3. Set up environment variables:
+3. Run database migrations:
    ```bash
-   cp apps/web/.env.example apps/web/.env.local
+   cd apps/web
+   npx prisma generate
+   npx prisma migrate dev --name add_usage_tracking
+   cd ../..
    ```
-   
-   Edit `apps/web/.env.local` and add your API keys and configuration.
 
-4. Run the development server:
+4. Start the development server:
    ```bash
    pnpm dev
    ```
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Project Structure
+## Troubleshooting
 
-```
-resume-bot/
-├── apps/
-│   ├── web/               # Next.js web application
-│   │   ├── app/           # App Router pages
-│   │   ├── components/    # React components
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── lib/           # Utility functions and libraries
-│   │   └── public/        # Static assets
-│   └── mobile/            # React Native mobile app (Expo)
-├── packages/              # Shared packages (future expansion)
-└── pnpm-workspace.yaml    # PNPM workspace configuration
-```
+### Database Connection Issues
 
-## Environment Variables
+If you encounter database connection errors:
+1. Run the `fix-database.bat` script to repair the connection
+2. Check that PostgreSQL is running on port 5432
+3. Verify your DATABASE_URL is correct in both `.env` and `.env.local` files:
+   ```
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/jobbot
+   ```
+   Note: Use `postgres://` protocol, not `postgresql://`
+4. Create the database manually if needed:
+   ```bash
+   psql -U postgres -c "CREATE DATABASE jobbot;"
+   ```
+5. Try running the migrations manually:
+   ```bash
+   cd apps/web
+   npx prisma generate
+   npx prisma migrate dev --name add_usage_tracking
+   ```
 
-The following environment variables are required:
+### API Provider Issues
 
-```
-# Authentication
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key
+If AI providers aren't working:
+1. Check that your API keys are correctly set in .env.local
+2. Verify the API keys are valid and have sufficient credits
+3. Check the server logs for specific error messages
+4. Try using a different provider (OpenAI, Anthropic, or Google)
 
-# AI Providers (at least one is required)
-OPENAI_API_KEY=your-openai-api-key
-ANTHROPIC_API_KEY=your-anthropic-api-key
-GOOGLE_API_KEY=your-google-api-key
+### TypeScript/Dependency Issues
 
-# Storage (defaults to local)
-STORAGE_PROVIDER=local
-STORAGE_BASE_URL=http://localhost:3000
-```
+If you encounter TypeScript errors or dependency issues:
+1. Run the `update-deps.bat` script to update dependencies
+2. Check for TypeScript errors with `pnpm -w run typecheck`
+3. Clean node_modules cache with `pnpm -w run clean`
+4. Reinstall dependencies with `pnpm install`
 
-## Health Check
+### Application Not Loading
 
-The application includes a health check endpoint at `/api/health` that returns the status of the application and environment variables (presence only, not values).
+If the application doesn't load:
+1. Check the terminal output for errors
+2. Verify that all required environment variables are set
+3. Run the `cleanup-repo.bat` script to clean up any redundant files
+4. Restart the development server with `pnpm dev`
 
-## Development Tools
+## Usage
 
-- **Debug Endpoint**: In development mode, you can view recent errors at `/api/debug/last-errors`
-- **API Testing**: Use the provided Vitest tests to verify API functionality
+1. Navigate to the JobBot page
+2. Upload your resume (PDF or DOCX)
+3. Paste the job description
+4. Select your preferred AI provider (or use Auto)
+5. Click "Generate Resume Kit"
+6. Download the tailored resume and cover letter
 
-## Deployment
+## Key Features
 
-The application can be deployed to any platform that supports Next.js applications:
+### Google Provider Integration
+- Support for latest Gemini models (2.5 Pro, 2.5 Flash)
+- Fallback mechanisms for different model capabilities
+- Robust error handling and provider switching
+- Token usage estimation when exact counts unavailable
 
-- Vercel (recommended)
-- Netlify
-- AWS Amplify
-- Self-hosted (Node.js server)
+### JSON Parsing and Validation
+- Extracts valid JSON from model responses
+- Handles malformed responses gracefully
+- Validates against Zod schemas
+- Provides detailed error messages for debugging
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -am 'Add my feature'`
-4. Push to the branch: `git push origin feature/my-feature`
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Usage Tracking
+- Counts tokens per provider and generation
+- Records successful and failed generations
+- Displays usage information in the UI
+- Supports transaction-based database operations

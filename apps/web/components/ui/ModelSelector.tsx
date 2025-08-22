@@ -6,7 +6,7 @@ import { createDevLogger } from "@/lib/utils/devLogger";
 
 const logger = createDevLogger("ui:modelSelector");
 
-type Provider = 'openai' | 'anthropic' | 'gemini' | 'auto';
+type Provider = 'openai' | 'anthropic' | 'google' | 'auto';
 
 interface Model {
   id: string;
@@ -41,7 +41,7 @@ export default function ModelSelector({
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({
     openai: { available: false, models: [] },
     anthropic: { available: false, models: [] },
-    gemini: { available: false, models: [] }
+    google: { available: false, models: [] }
   });
   
   const [selectedProvider, setSelectedProvider] = useState<Provider>(defaultProvider);
@@ -169,7 +169,7 @@ export default function ModelSelector({
             Auto (Best)
           </button>
           
-          {['openai', 'anthropic', 'gemini'].map((provider) => (
+          {['openai', 'anthropic', 'google'].map((provider) => (
             <button
               key={provider}
               type="button"
@@ -183,11 +183,11 @@ export default function ModelSelector({
                   : 'bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300'
               }`}
               onClick={() => handleProviderChange(provider as Provider)}
-              title={!providers[provider]?.available ? `${provider.toUpperCase()}_API_KEY not set` : undefined}
+              title={!providers[provider]?.available ? `${provider === 'google' ? 'GOOGLE_API_KEY' : `${provider.toUpperCase()}_API_KEY`} not set` : undefined}
             >
               {provider === 'openai' ? 'OpenAI' :
                provider === 'anthropic' ? 'Anthropic' : 
-               provider === 'gemini' ? 'Google' : provider}
+               provider === 'google' ? 'Google' : provider}
             </button>
           ))}
         </div>

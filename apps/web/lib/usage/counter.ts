@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 import { createDevLogger } from '../utils/devLogger';
+import { prisma } from '../db';
 
 const logger = createDevLogger('usage:counter');
 
@@ -53,9 +54,13 @@ export function getUserUsage(): { count: number; limit: number; remaining: numbe
 /**
  * Increment usage for the current user
  * @param what What was used
+ * @param transaction Optional transaction for database operations
  * @returns Updated usage information
  */
-export async function incrementUsage(what: string): Promise<{ count: number; limit: number; remaining: number }> {
+export async function incrementUsage(
+  what: string, 
+  transaction?: any
+): Promise<{ count: number; limit: number; remaining: number }> {
   const userId = getUserId();
   
   if (!usageStore[userId]) {
@@ -74,7 +79,107 @@ export async function incrementUsage(what: string): Promise<{ count: number; lim
   
   logger.info(`Usage incremented for ${userId}: ${what}, count=${count}, remaining=${remaining}`);
   
+  // If we have a transaction, update the database usage counter
+  if (transaction) {
+    try {
+      // Update or create usage counter in database
+      await transaction.usageCounter.upsert({
+        where: { userId },
+        update: {
+          generations: { increment: 1 },
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          generations: 1,
+          inputTokens: 0,
+          outputTokens: 0,
+          estimatedTokens: 0,
+          updatedAt: new Date()
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to update usage counter in database', error);
+    }
+  }
+  
   return { count, limit, remaining };
+}
+
+/**
+ * Record a generation in the database
+ * @param options Generation details
+ */
+export async function recordGeneration({
+  traceId,
+  provider,
+  type,
+  status,
+  inputChars,
+  outputChars,
+  inputTokens,
+  outputTokens,
+  estimatedTokens,
+  errorMessage,
+  transaction
+}: {
+  traceId: string;
+  provider: string;
+  type: 'resume' | 'cover_letter' | 'ats_report';
+  status: 'success' | 'error';
+  inputChars: number;
+  outputChars?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedTokens?: number;
+  errorMessage?: string;
+  transaction: any;
+}): Promise<void> {
+  const userId = getUserId();
+  
+  try {
+    // Create generation record
+    await transaction.generation.create({
+      data: {
+        userId,
+        traceId,
+        provider,
+        type,
+        status,
+        inputChars,
+        outputChars: outputChars || 0,
+        inputTokens: inputTokens || 0,
+        outputTokens: outputTokens || 0,
+        estimatedTokens: estimatedTokens || 0,
+        errorMessage,
+        createdAt: new Date()
+      }
+    });
+    
+    // If successful and we have token usage, update the usage counter
+    if (status === 'success' && (inputTokens || outputTokens || estimatedTokens)) {
+      await transaction.usageCounter.upsert({
+        where: { userId_provider: { userId, provider } },
+        update: {
+          inputTokens: { increment: inputTokens || 0 },
+          outputTokens: { increment: outputTokens || 0 },
+          estimatedTokens: { increment: estimatedTokens || 0 },
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          provider,
+          inputTokens: inputTokens || 0,
+          outputTokens: outputTokens || 0,
+          estimatedTokens: estimatedTokens || 0,
+          generations: 1,
+          updatedAt: new Date()
+        }
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to record generation: ${traceId}`, error);
+  }
 }
 
 /**
