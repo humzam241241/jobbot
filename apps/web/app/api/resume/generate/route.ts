@@ -55,12 +55,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       ok: false,
       id: reqId,
-      error: 'USAGE_LIMIT_REACHED', 
+      code: 'USAGE_LIMIT_REACHED',
       message: 'You have reached your usage limit. Please try again later.',
       usage: getUserUsage(),
     }, { status: 429 });
   }
-  
+
   try {
     const result = await parseBody(req);
     if ('error' in result) {
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         ...result.error 
       }, { status: 400 });
     }
-    
+
     const { jobDescription, jobUrl, provider, model, resume } = result.data;
     const resumeText = resume ? await resume.text() : '';
     const userId = 'anon'; // Replace with session user if available
@@ -119,38 +119,53 @@ export async function POST(req: NextRequest) {
         usage
       }, { status: 200 });
 
-    } catch (e: any) {
-      logger.error(`Generation failed [${reqId}]`, e);
-      recordError(reqId, e);
+    } catch (err: any) {
+      const payload = {
+        ok: false,
+        id: reqId,
+        code: err?.code ?? 'UNEXPECTED_ERROR',
+        message: err?.message ?? 'Unexpected error',
+        provider,
+        model,
+        issues: err?.issues ?? undefined,
+        preview: err?.preview ?? undefined,
+      };
+      console.error('[DEV:api:resume:generate] ERROR:', payload);
+      
+      // Record error
+      recordError(reqId, err);
       
       // Record failed generation
       await recordGeneration({
         traceId: reqId,
         userId,
-        provider: e?.provider || provider || 'unknown',
+        provider: err?.provider || provider || 'unknown',
         type: 'resume',
         status: 'error',
         inputChars: jobDescription.length + resumeText.length,
-        errorMessage: e?.message || 'Unknown error',
+        errorMessage: err?.message || 'Unknown error',
         transaction: db
-      }).catch(err => logger.warn('Failed to record generation error', err));
+      }).catch(e => logger.warn('Failed to record generation error', e));
       
-      return NextResponse.json({ 
-        ok: false,
-        id: reqId,
-        error: e?.code || 'GENERATION_FAILED',
-        message: e?.message || 'Failed to generate resume',
-        preview: e?.preview,
-      }, { status: 422 });
+      return NextResponse.json(payload, { 
+        status: payload.code?.includes('PARSE') || payload.code?.includes('VALIDATE') ? 422 : 500 
+      });
     }
   } catch (err: any) {
-    logger.error(`Unexpected error [${reqId}]`, err);
-    recordError(reqId, err);
-    return NextResponse.json({ 
+    const payload = {
       ok: false,
       id: reqId,
-      error: 'INTERNAL_ERROR', 
-      message: err?.message || 'Unexpected error',
-    }, { status: 500 });
+      code: err?.code ?? 'UNEXPECTED_ERROR',
+      message: err?.message ?? 'Unexpected error',
+      provider: err?.provider,
+      model: err?.model,
+      issues: err?.issues ?? undefined,
+      preview: err?.preview ?? undefined,
+    };
+    console.error('[DEV:api:resume:generate] ERROR:', payload);
+    recordError(reqId, err);
+    return NextResponse.json(payload, { 
+      status: payload.code?.includes('PARSE') || payload.code?.includes('VALIDATE') ? 422 : 500 
+    });
   }
 }

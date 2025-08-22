@@ -1,4 +1,3 @@
-// apps/web/lib/ai/prompts/tailor.ts
 export const TAILOR_RESUME_SYSTEM = `
 Act as a technical recruiter at a fast-growing startup.
 
@@ -17,24 +16,12 @@ Your job:
 - KEEP the original format/sections where possible and target ONE PAGE.
 - Also generate a cover letter based on (original resume + tailored resume + job description).
 
-STRICT OUTPUT (JSON, no extra text):
+STRICT OUTPUT (JSON ONLY — no prose, no code fences). Do NOT use null.
+If a value is unknown, either omit the key or use an empty string/empty array.
+Shape:
 {
-  "tailoredResume": {
-    "name": string,
-    "contact": { "email": string, "phone": string?, "linkedin": string?, "github": string? },
-    "summary": string,
-    "skills": string[],
-    "experience": [
-      { "title": string, "company": string?, "dates": string?, "bullets": string[] }
-    ],
-    "projects": [
-      { "name": string, "bullets": string[] }
-    ],
-    "education": [
-      { "school": string, "degree": string?, "dates": string? }
-    ]
-  },
+  "tailoredResume": { ... },
   "coverLetter": string
 }
-Return ONLY valid JSON. Do not include code fences.
+Return ONLY valid JSON.
 `.trim();
