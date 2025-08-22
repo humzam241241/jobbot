@@ -1,92 +1,193 @@
-import { trace } from '../pipeline/trace';
-import { getAiProvider } from '../ai';
+import { createLogger } from '@/lib/logger';
 
-interface AtsScore {
-  overall: number;
-  skills: number;
-  experience: number;
-  education: number;
-  keywords: number;
+const logger = createLogger('ats-analyzer');
+
+interface ATSReport {
+  score: number;
+  matches: number;
+  total: number;
+  keywords: string[];
+  missingKeywords?: string[];
+  suggestions?: string[];
 }
 
-interface AtsAnalysis {
-  score: AtsScore;
-  matchedKeywords: string[];
-  missingKeywords: string[];
-  suggestions: string[];
-}
-
-export async function analyzeResumeAts(
-  resumeContent: string,
-  jobDescription: string
-): Promise<AtsAnalysis> {
+/**
+ * Analyzes resume content against job description to generate an ATS compatibility report
+ */
+export async function generateAtsReport(resumeContent: string, jobDescription: string): Promise<ATSReport> {
   try {
-    const provider = getAiProvider('auto');
+    logger.info('Generating ATS report');
     
-    const prompt = `
-      Analyze this resume against the job description for ATS compatibility.
-      Provide a detailed analysis in the following JSON format:
-      {
-        "score": {
-          "overall": number (0-100),
-          "skills": number (0-100),
-          "experience": number (0-100),
-          "education": number (0-100),
-          "keywords": number (0-100)
-        },
-        "matchedKeywords": string[],
-        "missingKeywords": string[],
-        "suggestions": string[]
-      }
-
-      Resume:
-      ${resumeContent}
-
-      Job Description:
-      ${jobDescription}
-
-      Provide specific, actionable suggestions for improving ATS compatibility.
-      Focus on keyword matches, formatting, and content alignment.
-      Identify both technical and soft skills mentioned in the job description.
-    `;
-
-    const response = await provider.generateText(prompt);
+    // Extract keywords from job description
+    const keywords = extractKeywords(jobDescription);
     
-    try {
-      const analysis = JSON.parse(response);
-      
-      // Validate and normalize the response
+    if (keywords.length === 0) {
+      logger.warn('No keywords extracted from job description');
       return {
-        score: {
-          overall: Math.min(100, Math.max(0, analysis.score.overall)),
-          skills: Math.min(100, Math.max(0, analysis.score.skills)),
-          experience: Math.min(100, Math.max(0, analysis.score.experience)),
-          education: Math.min(100, Math.max(0, analysis.score.education)),
-          keywords: Math.min(100, Math.max(0, analysis.score.keywords))
-        },
-        matchedKeywords: Array.isArray(analysis.matchedKeywords) ? analysis.matchedKeywords : [],
-        missingKeywords: Array.isArray(analysis.missingKeywords) ? analysis.missingKeywords : [],
-        suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
-      };
-    } catch (error) {
-      trace('ats-analyzer', 'error', 'Failed to parse AI response', { error });
-      
-      // Return a fallback analysis if parsing fails
-      return {
-        score: {
-          overall: 0,
-          skills: 0,
-          experience: 0,
-          education: 0,
-          keywords: 0
-        },
-        matchedKeywords: [],
-        missingKeywords: [],
-        suggestions: ['Failed to analyze resume. Please try again.']
+        score: 100,
+        matches: 0,
+        total: 0,
+        keywords: []
       };
     }
-  } catch (error: any) {
-    trace('ats-analyzer', 'error', 'ATS analysis failed', { error: error.message });
-    throw error;
+    
+    // Check which keywords are present in the resume
+    const matches = keywords.filter(keyword => 
+      resumeContent.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    // Calculate score
+    const score = Math.round((matches.length / keywords.length) * 100);
+    
+    // Get missing keywords
+    const missingKeywords = keywords.filter(keyword => 
+      !resumeContent.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    // Generate suggestions
+    const suggestions = generateSuggestions(missingKeywords);
+    
+    logger.info('ATS report generated', { score, matches: matches.length, total: keywords.length });
+    
+    return {
+      score,
+      matches: matches.length,
+      total: keywords.length,
+      keywords: matches,
+      missingKeywords,
+      suggestions
+    };
+  } catch (error) {
+    logger.error('Error generating ATS report', { error });
+    
+    // Return a default report on error
+    return {
+      score: 0,
+      matches: 0,
+      total: 0,
+      keywords: []
+    };
   }
+}
+
+/**
+ * Extracts relevant keywords from job description
+ */
+function extractKeywords(jobDescription: string): string[] {
+  // Convert to lowercase for processing
+  const text = jobDescription.toLowerCase();
+  
+  // Remove common stop words and punctuation
+  const cleanText = text
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
+    .replace(/\s{2,}/g, ' ');
+    
+  // Split into words
+  const words = cleanText.split(' ');
+  
+  // Filter out common words and short words
+  const stopWords = new Set([
+    'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'against', 'between', 'into', 'through',
+    'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down', 'of', 'off', 'over', 'under',
+    'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any',
+    'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+    'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now',
+    'we', 'us', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him',
+    'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',
+    'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is',
+    'are', 'was', 'were', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'would', 'should',
+    'could', 'ought', 'i', 'me', 'my', 'myself'
+  ]);
+  
+  // Extract potential keywords (non-stop words)
+  const potentialKeywords = words.filter(word => 
+    word.length > 2 && !stopWords.has(word)
+  );
+  
+  // Count word frequency
+  const wordFrequency: Record<string, number> = {};
+  potentialKeywords.forEach(word => {
+    wordFrequency[word] = (wordFrequency[word] || 0) + 1;
+  });
+  
+  // Extract technical terms and skills (often contain special characters or are capitalized)
+  const technicalTerms = new Set<string>();
+  const regex = /[A-Z][a-z]+|[A-Z]+(?![a-z])|[a-z]+|\d+/g;
+  let match;
+  
+  while ((match = regex.exec(jobDescription)) !== null) {
+    const term = match[0];
+    if (term.length > 2 && !stopWords.has(term.toLowerCase())) {
+      technicalTerms.add(term);
+    }
+  }
+  
+  // Look for multi-word technical terms
+  const multiWordTerms = findMultiWordTerms(jobDescription);
+  
+  // Combine frequent words and technical terms
+  const frequentWords = Object.entries(wordFrequency)
+    .filter(([_, count]) => count > 1)
+    .map(([word]) => word);
+  
+  // Combine all keywords and remove duplicates
+  const allKeywords = [
+    ...frequentWords,
+    ...Array.from(technicalTerms),
+    ...multiWordTerms
+  ];
+  
+  // Remove duplicates and limit to top 30 keywords
+  return Array.from(new Set(allKeywords))
+    .filter(keyword => keyword.length > 2)
+    .slice(0, 30);
+}
+
+/**
+ * Find multi-word technical terms in the job description
+ */
+function findMultiWordTerms(text: string): string[] {
+  const commonTechTerms = [
+    'machine learning', 'artificial intelligence', 'data science', 'deep learning',
+    'natural language processing', 'computer vision', 'software development',
+    'front end', 'back end', 'full stack', 'web development', 'mobile development',
+    'cloud computing', 'devops', 'project management', 'agile methodology',
+    'customer service', 'product management', 'user experience', 'user interface',
+    'quality assurance', 'business intelligence', 'data analysis', 'data visualization',
+    'database management', 'network security', 'information technology', 'technical support',
+    'system administration', 'content management', 'digital marketing', 'search engine optimization',
+    'social media marketing', 'email marketing', 'market research', 'financial analysis',
+    'human resources', 'customer relationship management', 'supply chain management',
+    'operations management', 'strategic planning', 'risk management', 'change management',
+    'sales management', 'account management', 'business development', 'public relations',
+    'corporate communications', 'legal compliance', 'regulatory compliance', 'quality control',
+    'continuous improvement', 'process improvement', 'performance optimization'
+  ];
+  
+  // Check which common tech terms appear in the text
+  return commonTechTerms.filter(term => 
+    text.toLowerCase().includes(term.toLowerCase())
+  );
+}
+
+/**
+ * Generate suggestions based on missing keywords
+ */
+function generateSuggestions(missingKeywords: string[]): string[] {
+  if (missingKeywords.length === 0) {
+    return ['Your resume appears to match the job description well!'];
+  }
+  
+  const suggestions: string[] = [];
+  
+  if (missingKeywords.length > 0) {
+    suggestions.push(`Consider adding these keywords: ${missingKeywords.slice(0, 5).join(', ')}`);
+  }
+  
+  if (missingKeywords.length > 5) {
+    suggestions.push('Your resume is missing several key terms from the job description.');
+  }
+  
+  return suggestions;
 }

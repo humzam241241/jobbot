@@ -1,155 +1,114 @@
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { logger } from '@/lib/logging/logger';
-import { buildResumePdf } from '@/lib/pdf/buildResumePdf';
-import { googleTailorResume } from '@/lib/ai/providers/google';
-import { openaiTailorResume } from '@/lib/ai/providers/openai';
-import { anthropicTailorResume } from '@/lib/ai/providers/anthropic';
-import { Provider, validateProvider, checkProviderAvailable } from '@/lib/ai/providers/router';
+import { NextRequest, NextResponse } from 'next/server';
+import { createLogger } from '@/lib/logger';
+import { extractTextFromPdf } from '@/lib/pdf/extract';
+import { generatePdf } from '@/lib/pdf/generate';
+import { generateAtsReport } from '@/lib/ats/analyzer';
+import { modelRouter } from '@/lib/ai/router';
+import { retryWithBackoff } from '@/lib/utils/retry';
 
-export const runtime = "nodejs";
-
-const BodySchema = z.object({
-  jobDescription: z.string().min(10, 'Job description is too short'),
-  jobUrl: z.string().url().optional().or(z.literal('').transform(() => undefined)),
-  provider: z.string().default('auto'),
-  model: z.string().optional(),
-  resume: z.boolean().default(false),
-  resumeText: z.string().min(1, 'Resume text is required'),
-});
-
-function pickProviderOrder(requested: string): Provider[] {
-  if (requested === 'auto') {
-    return ['google', 'openai', 'anthropic'];
-  }
-  if (!validateProvider(requested)) {
-    logger.warn(`Invalid provider ${requested}, falling back to auto`);
-    return ['google', 'openai', 'anthropic'];
-  }
-  const others = ['google', 'openai', 'anthropic'].filter(p => p !== requested) as Provider[];
-  return [requested as Provider, ...others];
-}
+const logger = createLogger('resume-api');
 
 export async function POST(req: NextRequest) {
-  const traceId = crypto.randomUUID();
-  logger.info(`Starting resume generation [${traceId}]`);
-
   try {
-    // Parse and validate request
-    const body = await req.json().catch(() => ({}));
-    const result = BodySchema.safeParse(body);
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    const jobDescription = formData.get('jobDescription') as string;
+    const jobUrl = formData.get('jobUrl') as string;
+    const provider = formData.get('provider') as string || 'auto';
+    const model = formData.get('model') as string || 'default';
+
+    if (!file) {
+      return NextResponse.json({ error: { message: 'Resume file is required' } }, { status: 400 });
+    }
+
+    if (!jobDescription && !jobUrl) {
+      return NextResponse.json({ error: { message: 'Job description or URL is required' } }, { status: 400 });
+    }
+
+    logger.info('Starting resume generation', { provider, model });
+
+    // Extract text from resume
+    const resumeBuffer = Buffer.from(await file.arrayBuffer());
+    const resumeText = await extractTextFromPdf(resumeBuffer);
     
-    if (!result.success) {
-      return new Response(JSON.stringify({
-        ok: false,
-        errors: result.error.issues,
-      }), { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!resumeText || resumeText.length < 50) {
+      return NextResponse.json({ 
+        error: { message: 'Could not extract sufficient text from the resume file' } 
+      }, { status: 400 });
     }
 
-    const { jobDescription, provider, model, resume: wantsPdf, resumeText } = result.data;
-
-    // Try providers in sequence
-    const attempts = [];
-    let generatedText: string | null = null;
-
-    const providers = pickProviderOrder(provider);
-    for (const p of providers) {
-      // Check if provider is available
-      if (!checkProviderAvailable(p)) {
-        attempts.push({
-          provider: p,
-          error: 'API key not configured',
-          status: 503
-        });
-        continue;
-      }
-
+    // Get job description from URL if needed
+    let finalJobDescription = jobDescription;
+    if (!finalJobDescription && jobUrl) {
       try {
-        logger.info(`Attempting with provider: ${p}`);
-        
-        if (p === 'google') {
-          generatedText = await googleTailorResume({
-            apiKey: process.env.GOOGLE_API_KEY!,
-            model,
-            resumeText,
-            jobDescription
-          });
-        }
-        else if (p === 'openai') {
-          generatedText = await openaiTailorResume({
-            apiKey: process.env.OPENAI_API_KEY!,
-            model,
-            resumeText,
-            jobDescription
-          });
-        }
-        else if (p === 'anthropic') {
-          generatedText = await anthropicTailorResume({
-            apiKey: process.env.ANTHROPIC_API_KEY!,
-            model,
-            resumeText,
-            jobDescription
-          });
-        }
-
-        if (generatedText) {
-          logger.info(`Success with provider: ${p}`);
-          break;
-        }
-      } catch (err: any) {
-        logger.error(`Error with provider ${p}:`, err);
-        attempts.push({
-          provider: p,
-          error: err.message || 'Unknown error',
-          status: err.status || 500,
-          code: err.code
+        const response = await fetch('/api/extract-job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: jobUrl })
         });
+        
+        if (response.ok) {
+          const data = await response.json();
+          finalJobDescription = data.text;
+        }
+      } catch (error) {
+        logger.error('Error extracting job from URL', { error });
+        // Continue with empty job description
       }
     }
 
-    if (!generatedText) {
-      return new Response(JSON.stringify({
-        ok: false,
-        message: 'All providers failed',
-        attempts
-      }), { 
-        status: 502,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!finalJobDescription) {
+      return NextResponse.json({ 
+        error: { message: 'Could not extract job description from URL' } 
+      }, { status: 400 });
     }
 
-    // Return PDF or JSON based on request
-    if (wantsPdf) {
-      const pdfBytes = await buildResumePdf(generatedText);
-      return new Response(pdfBytes, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="resume-${traceId}.pdf"`
-        }
+    // Generate optimized resume and cover letter using AI
+    const aiClient = modelRouter(provider, model);
+    
+    const aiResponse = await retryWithBackoff(async () => {
+      return aiClient.generateResume({
+        resumeText,
+        jobDescription: finalJobDescription,
+        includeOriginalContent: true, // Include original content from resume
       });
-    }
+    }, 3);
 
-    return new Response(JSON.stringify({
-      ok: true,
-      text: generatedText,
-      attempts
-    }), { 
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
+    // Generate ATS report
+    const atsReport = await generateAtsReport(aiResponse.resumeContent, finalJobDescription);
+
+    // Generate PDF files
+    const resumePdf = await generatePdf({
+      content: aiResponse.resumeContent,
+      title: `${aiResponse.name || 'Generated'} Resume`,
+      originalContent: resumeText,
     });
 
-  } catch (err: any) {
-    logger.error('Unexpected error:', err);
-    return new Response(JSON.stringify({
-      ok: false,
-      error: err.message || 'Internal server error'
-    }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+    const coverLetterPdf = await generatePdf({
+      content: aiResponse.coverLetterContent,
+      title: `${aiResponse.name || 'Generated'} Cover Letter`,
     });
+
+    // Generate unique URLs for the PDFs
+    const resumeUrl = `/api/resume/download?id=${aiResponse.id}&type=resume`;
+    const coverLetterUrl = `/api/resume/download?id=${aiResponse.id}&type=cover`;
+
+    return NextResponse.json({
+      success: true,
+      resumeUrl,
+      coverLetterUrl,
+      ats: atsReport,
+    });
+  } catch (error: any) {
+    logger.error('Error generating resume', { error });
+    return NextResponse.json({ 
+      error: { message: error.message || 'An error occurred during resume generation' } 
+    }, { status: 500 });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
