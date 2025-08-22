@@ -1,65 +1,56 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { TAILOR_RESUME_SYSTEM } from '@/lib/ai/prompts/tailor';
-import { parseAndNormalizeLLMTextOrThrow, TailoredResume } from '@/lib/generators/tailorResume';
-import { compactText } from '@/lib/ai/compact';
-import { pickModel } from '@/lib/ai/modelMap';
+import { extractFirstJson } from '@/lib/json/extract';
+import { normalizeTailorJson, TailorResponseT } from '@/lib/schemas/resume';
+import { ProviderDefaultModels, supportsJsonSchema } from '../capabilities';
 
-export async function anthropicTailorResume({
-  jobDescription,
-  resumeText,
-  model,
-}: { jobDescription: string; resumeText: string; model?: string; }): Promise<TailoredResume> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw Object.assign(new Error('Missing ANTHROPIC_API_KEY'), { code: 'CONFIG_MISSING' });
+export async function anthropicTailorResume({ apiKey, model, system, user }: { apiKey: string; model?: string; system: string; user: string; }): Promise<TailorResponseT> {
+  const client = new Anthropic({ apiKey });
+  const mdl = model || ProviderDefaultModels.anthropic;
 
-  const finalModel = pickModel('anthropic', model);
-  const client = new Anthropic({ apiKey: key });
+  const common = {
+    model: mdl,
+    max_tokens: 2048,
+    system,
+    messages: [{ role: 'user', content: user }],
+  } as const;
 
-  const jd = compactText(jobDescription, 8000);
-  const rez = compactText(resumeText, 16000);
-
-  const system = TAILOR_RESUME_SYSTEM + '\nReturn ONLY a JSON object. No markdown fences, no extra text.';
-  const user = [
-    '--- ORIGINAL RESUME ---', rez,
-    '',
-    '--- JOB DESCRIPTION ---', jd,
-    '',
-    'Output strictly valid JSON with the required keys.'
-  ].join('\n');
-
-  try {
-    // Do NOT send response_format unless you know your SDK supports it; some versions 400.
-    const msg = await client.messages.create({
-      model: finalModel,
-      max_tokens: 2000,
-      temperature: 0.2,
-      system,
-      messages: [{ role: 'user', content: user }],
+  if (supportsJsonSchema('anthropic', mdl)) {
+    // Minimal hand-written schema for Claude 3.7+
+    const resp = await client.messages.create({
+      ...common,
+      response_format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: {
+            tailoredResume: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                contact: { type: 'object' },
+                summary: { type: 'string' },
+                skills: { type: 'array' },
+                experience: { type: 'array' },
+                education: { type: 'array' },
+                projects: { type: 'array' },
+              },
+              required: ['name', 'summary', 'skills', 'experience']
+            },
+            coverLetter: { type: 'string' }
+          },
+          required: ['tailoredResume', 'coverLetter']
+        }
+      },
     });
 
-    const text = msg.content?.[0]?.type === 'text' ? msg.content[0].text : '';
-    if (!text.trim()) {
-      const e: any = new Error('MODEL_EMPTY_OUTPUT');
-      e.code = 'MODEL_EMPTY_OUTPUT';
-      throw e;
-    }
-    return parseAndNormalizeLLMTextOrThrow(text);
-  } catch (err: any) {
-    const msg = String(err?.message ?? '');
-    const status = err?.status;
-
-    if (status === 400 && /response_format/i.test(msg)) {
-      const e: any = new Error('PARAM_NOT_SUPPORTED');
-      e.code = 'PARAM_NOT_SUPPORTED';
-      e.hint = 'Anthropic SDK does not support response_format. Removed.';
-      throw e;
-    }
-    if (status === 404) {
-      const e: any = new Error('MODEL_NOT_FOUND');
-      e.code = 'MODEL_NOT_FOUND';
-      e.hint = `Requested "${model}", using "${finalModel}" for Anthropic.`;
-      throw e;
-    }
-    throw err;
+    const text = resp.content?.[0]?.type === 'text' ? resp.content[0].text : '';
+    const json = extractFirstJson(text) ?? text;
+    return normalizeTailorJson(JSON.parse(json));
   }
+
+  // Fallback: no response_format
+  const resp = await client.messages.create({ ...common });
+  const text = resp.content?.[0]?.type === 'text' ? resp.content[0].text : '';
+  const json = extractFirstJson(text) ?? text;
+  return normalizeTailorJson(JSON.parse(json));
 }

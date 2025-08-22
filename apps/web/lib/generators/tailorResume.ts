@@ -1,60 +1,204 @@
-import { z } from 'zod';
-import { extractJsonBlocks, normalizeResumeJson } from '@/lib/ai/json';
-import { TAILOR_RESUME_SYSTEM } from '@/lib/ai/prompts/tailor';
+import { googleTailorResume } from '@/lib/ai/providers/google';
+import { openaiTailorResume } from '@/lib/ai/providers/openai';
+import { anthropicTailorResume } from '@/lib/ai/providers/anthropic';
+import { TailorResponseT } from '@/lib/schemas/resume';
+import { ProviderDefaultModels } from '@/lib/ai/capabilities';
+import { compactText } from '@/lib/ai/compact';
 
-// turns null → undefined so optional defaults apply
-const NullableStr = z.preprocess(v => (v === null ? undefined : v), z.string().optional());
+// Recruiter system prompt (verbatim)
+const SYSTEM_PROMPT = `Act as a technical recruiter at a fast-growing startup. I'm going to give you a resume. I want you to tailor it so it's ATS-optimized and looks like a high-potential candidate for the job description. Focus on results, impact and clarity; turn personal projects into real business value statements; rewrite bullet points using action verbs, measurable outcomes, and industry terminology. Use numerical metrics if there are any, don't invent any information, highlight transferable skills from non-technical roles, and keep the original format of the resume. Make it one page long.
 
-// contact allows any subset, but no nulls
-const ContactSchema = z.object({
-  email: NullableStr,
-  phone: NullableStr,
-  linkedin: NullableStr,
-  github: NullableStr,
-}).passthrough(); // allow extra keys if model adds them
+Also produce a concise cover letter based on the original resume, the new tailored resume, and the job description. Use information from the original resume to populate the new resume. Return ONLY the JSON object described by the response contract—no commentary.`;
 
-const ExperienceItem = z.object({
-  title: z.string(),
-  company: NullableStr,
-  dates: NullableStr,
-  bullets: z.array(z.string()).default([]),
-}).strict();
+export type Provider = 'google' | 'openai' | 'anthropic';
 
-export const TailoredResumeSchema = z.object({
-  name: z.string().optional().default(''),
-  contact: ContactSchema.default({}),
-  summary: z.string().optional().default(''),
-  skills: z.array(z.string()).default([]),
-  experience: z.array(ExperienceItem).default([]),
-  projects: z.array(z.object({
-    name: z.string(),
-    bullets: z.array(z.string()).default([]),
-  })).default([]),
-  education: z.array(z.object({
-    school: z.string(),
-    degree: NullableStr,
-    dates: NullableStr,
-  })).default([]),
-  coverLetter: z.string().optional().default(''),
-});
-export type TailoredResume = z.infer<typeof TailoredResumeSchema>;
+type TailorResumeResult = {
+  ok: boolean;
+  result?: TailorResponseT;
+  attempts: Array<{
+    provider: Provider;
+    code?: string;
+    status?: number;
+    message: string;
+    preview?: string;
+  }>;
+  provider?: Provider;
+  lastError?: Error;
+};
 
-export function parseAndNormalizeLLMTextOrThrow(text: string) {
-  const raw = extractJsonBlocks(text);
-  if (!raw) {
-    const err: any = new Error('JSON_PARSE_ERROR: No JSON found in model output');
-    err.code = 'JSON_PARSE_ERROR';
-    err.preview = (text || '').slice(0, 1200);
-    throw err;
+export async function tailorResume({
+  jobDescription,
+  resumeText,
+  provider = 'google',
+  model,
+}: {
+  jobDescription: string;
+  resumeText: string;
+  provider?: Provider;
+  model?: string;
+}): Promise<TailorResumeResult> {
+  // Order of fallbacks if primary fails
+  const providers: Provider[] = [provider];
+  if (provider !== 'openai') providers.push('openai');
+  if (provider !== 'anthropic') providers.push('anthropic');
+  if (provider !== 'google') providers.push('google');
+
+  const attempts: TailorResumeResult['attempts'] = [];
+  let lastError: Error | undefined;
+
+  // Compact inputs to avoid token limits
+  const jd = compactText(jobDescription, 8000);
+  const rez = compactText(resumeText, 16000);
+
+  // Build the user prompt
+  const userPrompt = [
+    '--- ORIGINAL RESUME ---',
+    rez,
+    '',
+    '--- JOB DESCRIPTION ---',
+    jd,
+    '',
+    'Return an object with shape: { tailoredResume: TailoredResume, coverLetter: string } and nothing else.',
+  ].join('\n');
+
+  // Try each provider in sequence
+  for (const p of providers) {
+    try {
+      console.log(`Attempting with provider: ${p}`);
+      
+      // Use the appropriate provider with its own model mapping
+      let result: TailorResponseT;
+      
+      if (p === 'google') {
+        const apiKey = process.env.GOOGLE_API_KEY;
+        if (!apiKey) throw new Error('Missing GOOGLE_API_KEY');
+        
+        // Google uses a single prompt
+        const googlePrompt = SYSTEM_PROMPT + '\n\n' + userPrompt;
+        result = await googleTailorResume({ 
+          apiKey, 
+          model: p === provider ? model : undefined, // Only use requested model for primary provider
+          prompt: googlePrompt 
+        });
+      } 
+      else if (p === 'openai') {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+        
+        result = await openaiTailorResume({ 
+          apiKey, 
+          model: p === provider ? model : undefined,
+          system: SYSTEM_PROMPT, 
+          user: userPrompt 
+        });
+      } 
+      else if (p === 'anthropic') {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error('Missing ANTHROPIC_API_KEY');
+        
+        result = await anthropicTailorResume({ 
+          apiKey, 
+          model: p === provider ? model : undefined,
+          system: SYSTEM_PROMPT, 
+          user: userPrompt 
+        });
+      }
+      else {
+        throw new Error(`Unknown provider: ${p}`);
+      }
+
+      // Success!
+      return {
+        ok: true,
+        result,
+        attempts,
+        provider: p,
+      };
+    } catch (err: any) {
+      console.error(`Error with provider ${p}:`, err);
+      lastError = err;
+      
+      // Record the attempt
+      attempts.push({
+        provider: p,
+        code: err.code,
+        status: err.status,
+        message: err.message || 'Unknown error',
+        preview: err.preview || err.raw?.slice?.(0, 200),
+      });
+
+      // If it's a parsing error, try once more with a stronger JSON instruction
+      if (err.message?.includes('JSON') && !attempts.find(a => a.provider === p && a.message?.includes('retry'))) {
+        try {
+          console.log(`Retrying ${p} with explicit JSON instruction`);
+          
+          // Add stronger JSON instruction
+          const retryUserPrompt = userPrompt + '\n\nReturn ONLY JSON. No pre/post text.';
+          
+          let retryResult: TailorResponseT;
+          
+          if (p === 'google') {
+            const apiKey = process.env.GOOGLE_API_KEY;
+            if (!apiKey) throw new Error('Missing GOOGLE_API_KEY');
+            
+            const googlePrompt = SYSTEM_PROMPT + '\n\n' + retryUserPrompt;
+            retryResult = await googleTailorResume({ 
+              apiKey, 
+              model: p === provider ? model : undefined,
+              prompt: googlePrompt 
+            });
+          } 
+          else if (p === 'openai') {
+            const apiKey = process.env.OPENAI_API_KEY;
+            if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+            
+            retryResult = await openaiTailorResume({ 
+              apiKey, 
+              model: p === provider ? model : undefined,
+              system: SYSTEM_PROMPT + '\nReturn ONLY JSON. No markdown fences, no commentary.',
+              user: retryUserPrompt 
+            });
+          } 
+          else if (p === 'anthropic') {
+            const apiKey = process.env.ANTHROPIC_API_KEY;
+            if (!apiKey) throw new Error('Missing ANTHROPIC_API_KEY');
+            
+            retryResult = await anthropicTailorResume({ 
+              apiKey, 
+              model: p === provider ? model : undefined,
+              system: SYSTEM_PROMPT + '\nReturn ONLY JSON. No markdown fences, no commentary.',
+              user: retryUserPrompt 
+            });
+          }
+          else {
+            throw new Error(`Unknown provider: ${p}`);
+          }
+
+          // Success on retry!
+          return {
+            ok: true,
+            result: retryResult,
+            attempts,
+            provider: p,
+          };
+        } catch (retryErr: any) {
+          console.error(`Retry failed with provider ${p}:`, retryErr);
+          attempts.push({
+            provider: p,
+            code: retryErr.code,
+            status: retryErr.status,
+            message: `Retry failed: ${retryErr.message || 'Unknown error'}`,
+            preview: retryErr.preview || retryErr.raw?.slice?.(0, 200),
+          });
+        }
+      }
+    }
   }
-  const normalized = normalizeResumeJson(raw);
-  const parsed = TailoredResumeSchema.safeParse(normalized);
-  if (!parsed.success) {
-    const err: any = new Error('JSON_VALIDATE_ERROR: Zod validation failed');
-    err.code = 'JSON_VALIDATE_ERROR';
-    err.preview = JSON.stringify(normalized, null, 2).slice(0, 1200);
-    err.issues = parsed.error.issues;
-    throw err;
-  }
-  return parsed.data;
+
+  // All providers failed
+  return {
+    ok: false,
+    attempts,
+    lastError,
+  };
 }

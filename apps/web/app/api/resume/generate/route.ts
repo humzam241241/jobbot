@@ -4,75 +4,18 @@ import { getDbOrNull } from '@/lib/db';
 import { recordGeneration, getUserUsage, hasReachedLimit } from '@/lib/usage';
 import { createDevLogger } from "@/lib/utils/devLogger";
 import { recordError } from '../../debug/last-errors/route';
-import { googleTailorResume } from '@/lib/ai/providers/google';
-import { openaiTailorResume } from '@/lib/ai/providers/openai';
-import { anthropicTailorResume } from '@/lib/ai/providers/anthropic';
+import { tailorResume, Provider } from '@/lib/generators/tailorResume';
 
 const logger = createDevLogger("api:resume:generate");
 
 export const dynamic = "force-dynamic";
 
-const FALLBACK_ENABLED = process.env.LLM_AUTO_FALLBACK !== '0';
-
-type ProviderKey = 'google' | 'openai' | 'anthropic';
-
 const BodySchema = z.object({
   jobDescription: z.string().min(10, 'Job description is too short'),
   jobUrl: z.string().url().optional().or(z.literal('').transform(() => undefined)),
   provider: z.enum(['auto','openai','anthropic','google']).default('auto'),
-  model: z.string().min(1, 'Model is required'),
+  model: z.string().optional(),
 });
-
-async function attemptOne(p: ProviderKey, args: any) {
-  if (p === 'google')  return googleTailorResume(args);
-  if (p === 'openai')  return openaiTailorResume(args);
-  if (p === 'anthropic') return anthropicTailorResume(args);
-  throw new Error(`Unknown provider: ${p}`);
-}
-
-function availableProviders(): ProviderKey[] {
-  const out: ProviderKey[] = [];
-  if (process.env.GOOGLE_API_KEY) out.push('google');
-  if (process.env.OPENAI_API_KEY) out.push('openai');
-  if (process.env.ANTHROPIC_API_KEY) out.push('anthropic');
-  return out;
-}
-
-async function runWithFallback(primary: ProviderKey, args: any) {
-  const seen: Record<string, true> = {};
-  const order = [primary, ...(['google','openai','anthropic'] as ProviderKey[]).filter(x => x !== primary)];
-  const avail = availableProviders().filter(p => order.includes(p));
-  const attempts: any[] = [];
-
-  for (const p of order) {
-    if (!avail.includes(p)) continue; // skip unavailable
-    if (seen[p]) continue;
-    seen[p] = true;
-
-    try {
-      const result = await attemptOne(p, args);
-      return { ok: true, provider: p, result, attempts };
-    } catch (err: any) {
-      attempts.push({
-        provider: p,
-        code: err?.code ?? 'UNEXPECTED_ERROR',
-        message: err?.message ?? String(err),
-        status: err?.status,
-        retryAfter: err?.retryAfter,
-        preview: err?.preview,
-      });
-
-      // Only fall back on "soft" errors; stop on hard config errors
-      const soft = ['RATE_LIMIT','MODEL_EMPTY_OUTPUT','JSON_PARSE_ERROR','JSON_VALIDATE_ERROR'];
-      const hard = ['CONFIG_MISSING','AUTH_ERROR'];
-      if (!FALLBACK_ENABLED || hard.includes(err?.code)) {
-        return { ok: false, attempts, lastError: err };
-      }
-      // continue to next provider for soft errors
-    }
-  }
-  return { ok: false, attempts, lastError: attempts[attempts.length - 1] };
-}
 
 async function parseBody(req: NextRequest) {
   const ct = req.headers.get('content-type') || '';
@@ -82,7 +25,7 @@ async function parseBody(req: NextRequest) {
     const jobDescription = String(fd.get('jdText') ?? '');
     const jobUrl = fd.get('jdUrl') ? String(fd.get('jdUrl')) : undefined;
     const provider = String(fd.get('provider') ?? 'auto').toLowerCase();
-    const model = String(fd.get('model') ?? '').trim();
+    const model = String(fd.get('model') ?? '').trim() || undefined;
 
     const parsed = BodySchema.safeParse({ jobDescription, jobUrl, provider, model });
     if (!parsed.success) {
@@ -131,11 +74,17 @@ export async function POST(req: NextRequest) {
     const userId = 'anon'; // Replace with session user if available
     const db = getDbOrNull();
 
-    const primary = (provider as ProviderKey) ?? 'google';
-    const args = { jobDescription, resumeText, model };
+    // Map 'auto' to default provider
+    const primary = provider === 'auto' ? 'google' : provider as Provider;
 
+    // Run the tailored resume generator
     const { ok, result: tailoredResult, attempts, lastError, provider: usedProvider } = 
-      await runWithFallback(primary, args);
+      await tailorResume({
+        jobDescription,
+        resumeText,
+        provider: primary,
+        model,
+      });
 
     if (ok && tailoredResult) {
       // Record successful generation
@@ -165,6 +114,11 @@ export async function POST(req: NextRequest) {
     }
 
     const err: any = lastError ?? {};
+    const status =
+      err?.code === 'RATE_LIMIT' ? 429 :
+      err?.code === 'MODEL_NOT_FOUND' ? 400 :
+      err?.code?.includes('PARSE') || err?.code?.includes('VALIDATE') ? 422 : 500;
+
     const payload = {
       ok: false,
       id: reqId,
@@ -173,12 +127,9 @@ export async function POST(req: NextRequest) {
       provider: primary,
       model,
       attempts,
+      hint: err?.hint,
       preview: err?.preview,
     };
-
-    const status =
-      payload.code === 'RATE_LIMIT' ? 429 :
-      payload.code?.includes('PARSE') || payload.code?.includes('VALIDATE') ? 422 : 500;
 
     // Record error
     recordError(reqId, err);
