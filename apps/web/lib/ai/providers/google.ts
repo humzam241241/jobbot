@@ -1,57 +1,70 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { extractFirstJson } from '@/lib/json/extract';
-import { normalizeTailorJson, TailorResponseT } from '@/lib/schemas/resume';
-import { ProviderDefaultModels } from '../capabilities';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { forceJsonPrompt, extractFirstJsonObject, repairWithProvider } from "../utils/json";
+import { tailorResponseSchema, TailorResponseT } from "@/lib/schemas/resume";
+import { resolveModel } from "../resolveModel";
 
-export async function googleTailorResume({ apiKey, model, prompt }: { apiKey: string; model?: string; prompt: string; }): Promise<TailorResponseT> {
+type Args = { apiKey: string; model?: string; prompt: string; schemaText: string };
+
+export async function googleTailorResume({ apiKey, model, prompt, schemaText }: Args): Promise<TailorResponseT> {
   const client = new GoogleGenerativeAI(apiKey);
-  const mdl = model || ProviderDefaultModels.google;
+  const finalModel = resolveModel("google", model);
 
-  const gen = client.getGenerativeModel({ model: mdl });
-  
-  // Add explicit JSON instruction to the prompt
-  const jsonPrompt = prompt + '\n\nIMPORTANT: Return your response as a valid JSON object with this exact shape:\n{' +
-    '"tailoredResume": {' +
-    '  "name": string,' +
-    '  "contact": { "email": string, "phone"?: string, "location"?: string, "linkedin"?: string, "github"?: string },' +
-    '  "summary": string,' +
-    '  "skills": string[],' +
-    '  "experience": [{ "company": string, "role": string, "location"?: string, "dates"?: string, "bullets": string[] }],' +
-    '  "projects": [{ "name": string, "tech"?: string[], "bullets": string[] }],' +
-    '  "education": [{ "school": string, "degree"?: string, "dates"?: string }]' +
-    '},' +
-    '"coverLetter": string' +
-    '}\n';
+  const doCall = async (p: string) => {
+    try {
+      const r = await client.generateContent({
+        model: finalModel,
+        contents: [{ role: "user", parts: [{ text: p }]}],
+        generationConfig: {
+          temperature: 0.2,
+          candidateCount: 1,
+          stopSequences: ["}"],
+          maxOutputTokens: 4000,
+        }
+      });
 
-  try {
-    const result = await gen.generateContent({
-      contents: [{ role: 'user', parts: [{ text: jsonPrompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-        topK: 40,
-        topP: 0.95,
+      if (!r.response.ok) {
+        throw new Error(r.response.text());
       }
-    });
 
-    const text = result.response.text();
-    if (!text?.trim()) {
-      throw new Error('Empty response from model');
-    }
+      return r.response.text();
+    } catch (err: any) {
+      // Map Google errors to our error types
+      const msg = String(err?.message || err);
+      
+      if (msg.includes('quota') || msg.includes('rate limit')) {
+        const e: any = new Error('RATE_LIMIT');
+        e.code = 'RATE_LIMIT';
+        e.status = 429;
+        throw e;
+      }
 
-    // Extract JSON from response
-    const json = extractFirstJson(text);
-    if (!json) {
-      throw new Error('No valid JSON found in response');
-    }
+      if (msg.includes('model not found') || msg.includes('does not exist')) {
+        const e: any = new Error('MODEL_NOT_FOUND');
+        e.code = 'MODEL_NOT_FOUND';
+        e.hint = `Model "${model}" not found. Using "${finalModel}" for Google.`;
+        throw e;
+      }
 
-    // Parse and validate
-    return normalizeTailorJson(JSON.parse(json));
-  } catch (err: any) {
-    if (err.message?.includes('Empty response') || err.message?.includes('No valid JSON')) {
-      const e: any = new Error('MODEL_EMPTY_OUTPUT');
-      e.code = 'MODEL_EMPTY_OUTPUT';
-      throw e;
+      throw err;
     }
-    throw err;
+  };
+
+  // Add strong JSON hints to the prompt
+  const jsonPrompt = [
+    prompt,
+    "\nYou MUST return a valid JSON object with this exact structure:",
+    schemaText,
+    "\nReturn ONLY the JSON object. No markdown fences, no commentary.",
+    "\nEnsure all required fields are present and non-null.",
+  ].join("\n");
+
+  const text = await doCall(jsonPrompt);
+  let json = extractFirstJsonObject(text);
+
+  try { 
+    return tailorResponseSchema.parse(json); 
+  } catch (e) {
+    const fixed = await repairWithProvider<TailorResponseT>("google", doCall, json, e as any);
+    return tailorResponseSchema.parse(fixed);
   }
 }

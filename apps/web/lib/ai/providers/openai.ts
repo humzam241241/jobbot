@@ -1,87 +1,52 @@
-import OpenAI from 'openai';
-import { extractFirstJson } from '@/lib/json/extract';
-import { normalizeTailorJson, TailorResponseT } from '@/lib/schemas/resume';
-import { ProviderDefaultModels } from '../capabilities';
+import OpenAI from "openai";
+import { forceJsonPrompt, extractFirstJsonObject, repairWithProvider } from "../utils/json";
+import { tailorResponseSchema, TailorResponseT } from "@/lib/schemas/resume";
+import { resolveModel } from "../resolveModel";
 
-export async function openaiTailorResume({ apiKey, model, system, user }: { apiKey: string; model?: string; system: string; user: string; }): Promise<TailorResponseT> {
-  const client = new OpenAI({ apiKey });
-  const mdl = model || ProviderDefaultModels.openai;
+type Args = { apiKey: string; model?: string; prompt: string; schemaText: string };
 
-  // Add JSON structure guidance
-  const jsonStructure = `
-Return a JSON object with EXACTLY this structure:
-{
-  "tailoredResume": {
-    "name": string,
-    "contact": {
-      "email": string,
-      "phone": string | null,
-      "location": string | null,
-      "linkedin": string | null,
-      "github": string | null
-    },
-    "summary": string,
-    "skills": string[],
-    "experience": [{
-      "company": string,
-      "role": string,
-      "location": string | null,
-      "dates": string | null,
-      "bullets": string[]
-    }],
-    "projects": [{
-      "name": string,
-      "tech": string[] | null,
-      "bullets": string[]
-    }],
-    "education": [{
-      "school": string,
-      "degree": string | null,
-      "dates": string | null
-    }]
-  },
-  "coverLetter": string
-}`;
+export async function openaiTailorResume({ apiKey, model, prompt, schemaText }: Args): Promise<TailorResponseT> {
+  const openai = new OpenAI({ apiKey });
+  const finalModel = resolveModel("openai", model);
 
-  const enhancedSystem = `${system}\n\n${jsonStructure}\n\nEnsure all required fields are present and non-null.`;
+  const doCall = async (p: string) => {
+    try {
+      const r = await openai.chat.completions.create({
+        model: finalModel,
+        messages: [{ role: "user", content: p }],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 4000,
+      });
+      return r.choices[0]?.message?.content ?? "";
+    } catch (err: any) {
+      // Map OpenAI errors to our error types
+      if (err.status === 429 || /rate.*limit|quota/i.test(err.message)) {
+        const e: any = new Error('RATE_LIMIT');
+        e.code = 'RATE_LIMIT';
+        e.status = 429;
+        e.retryAfter = Number(err.headers?.['retry-after']) || 60;
+        throw e;
+      }
 
-  try {
-    const r = await client.chat.completions.create({
-      model: mdl,
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: enhancedSystem },
-        { role: 'user', content: user },
-      ],
-    });
+      if (err.status === 404 && /model.*not.*exist/i.test(err.message)) {
+        const e: any = new Error('MODEL_NOT_FOUND');
+        e.code = 'MODEL_NOT_FOUND';
+        e.hint = `Model "${model}" not found. Using "${finalModel}" for OpenAI.`;
+        throw e;
+      }
 
-    const text = r.choices[0]?.message?.content ?? '';
-    if (!text.trim()) {
-      const e: any = new Error('MODEL_EMPTY_OUTPUT');
-      e.code = 'MODEL_EMPTY_OUTPUT';
-      throw e;
+      throw err;
     }
+  };
 
-    // Extract JSON and normalize
-    const json = extractFirstJson(text) ?? text;
-    return normalizeTailorJson(JSON.parse(json));
-  } catch (err: any) {
-    // Handle OpenAI specific errors
-    if (err.status === 404 && /model .* does not exist/i.test(err.message)) {
-      const e: any = new Error('MODEL_NOT_FOUND');
-      e.code = 'MODEL_NOT_FOUND';
-      e.hint = `Requested "${model}", using "${mdl}" for OpenAI.`;
-      throw e;
-    }
+  const text = await doCall(forceJsonPrompt(prompt, schemaText));
+  let json = extractFirstJsonObject(text);
 
-    // Pass through known errors
-    if (err.code) throw err;
-
-    // Wrap unknown errors
-    const wrapped: any = new Error(err.message || 'OpenAI error');
-    wrapped.code = 'UNEXPECTED_ERROR';
-    wrapped.raw = err.raw || String(err);
-    throw wrapped;
+  try { 
+    return tailorResponseSchema.parse(json); 
+  } catch (e) {
+    const fixed = await repairWithProvider<TailorResponseT>("openai", doCall, json, e as any);
+    return tailorResponseSchema.parse(fixed);
   }
 }
