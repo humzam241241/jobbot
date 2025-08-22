@@ -1,89 +1,61 @@
-// apps/web/lib/ai/providers/openai.ts
+import OpenAI from 'openai';
 import { TAILOR_RESUME_SYSTEM } from '@/lib/ai/prompts/tailor';
 import { parseAndNormalizeLLMTextOrThrow, TailoredResume } from '@/lib/generators/tailorResume';
 import { compactText } from '@/lib/ai/compact';
+import { pickModel } from '@/lib/ai/modelMap';
 
 export async function openaiTailorResume({
   jobDescription,
   resumeText,
   model,
-}: { jobDescription: string; resumeText: string; model: string; }): Promise<TailoredResume> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw Object.assign(new Error('Missing OPENAI_API_KEY'), { code: 'CONFIG_MISSING' });
+}: { jobDescription: string; resumeText: string; model?: string; }): Promise<TailoredResume> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw Object.assign(new Error('Missing OPENAI_API_KEY'), { code: 'CONFIG_MISSING' });
 
-  // Compact inputs to avoid token limits
+  const finalModel = pickModel('openai', model);
+  const client = new OpenAI({ apiKey: key });
+
   const jd = compactText(jobDescription, 8000);
   const rez = compactText(resumeText, 16000);
 
+  const system = TAILOR_RESUME_SYSTEM;
+  const user = [
+    '--- ORIGINAL RESUME ---', rez,
+    '',
+    '--- JOB DESCRIPTION ---', jd,
+    '',
+    'Return ONLY valid JSON (no prose) with the required shape.',
+  ].join('\n');
+
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: TAILOR_RESUME_SYSTEM },
-          { role: 'user', content: [
-            '--- ORIGINAL RESUME ---\n' + rez,
-            '--- JOB DESCRIPTION ---\n' + jd,
-          ].join('\n\n') }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }, // Force JSON mode for GPT-4 and newer
-      }),
+    const r = await client.chat.completions.create({
+      model: finalModel,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      // Safer than json_schema; let our parser validate.
+      response_format: { type: 'json_object' },
     });
 
-    const json = await res.json().catch(() => ({}));
-    const text = json?.choices?.[0]?.message?.content ?? '';
-
-    // Handle API errors
-    if (!res.ok) {
-      const msg = String(json?.error?.message ?? 'OpenAI error');
-      const status = res.status;
-
-      // Handle specific error types
-      if (status === 429 || /rate.*limit|quota/i.test(msg)) {
-        const e: any = new Error('RATE_LIMIT');
-        e.code = 'RATE_LIMIT';
-        e.status = 429;
-        e.retryAfter = Number(res.headers.get('retry-after')) || 3;
-        e.raw = msg;
-        throw e;
-      }
-
-      if (status === 401 || /invalid.*api.*key|auth/i.test(msg)) {
-        const e: any = new Error('AUTH_ERROR');
-        e.code = 'AUTH_ERROR';
-        e.raw = msg;
-        throw e;
-      }
-
-      const err: any = new Error(msg);
-      err.code = 'API_ERROR';
-      err.status = status;
-      err.raw = JSON.stringify(json).slice(0, 1000);
-      throw err;
-    }
-
-    // Handle empty responses
-    if (!text?.trim()) {
+    const text = r.choices?.[0]?.message?.content ?? '';
+    if (!text.trim()) {
       const e: any = new Error('MODEL_EMPTY_OUTPUT');
       e.code = 'MODEL_EMPTY_OUTPUT';
       throw e;
     }
-
     return parseAndNormalizeLLMTextOrThrow(text);
   } catch (err: any) {
-    // Pass through known errors
-    if (err.code) throw err;
+    const msg = String(err?.message ?? '');
+    const status = err?.status;
 
-    // Wrap unknown errors
-    const wrapped: any = new Error(err.message || 'OpenAI error');
-    wrapped.code = 'UNEXPECTED_ERROR';
-    wrapped.raw = err.raw || String(err);
-    throw wrapped;
+    if (status === 404 && /model .* does not exist/i.test(msg)) {
+      const e: any = new Error('MODEL_NOT_FOUND');
+      e.code = 'MODEL_NOT_FOUND';
+      e.hint = `Requested "${model}", using "${finalModel}" for OpenAI.`;
+      throw e;
+    }
+    throw err;
   }
 }

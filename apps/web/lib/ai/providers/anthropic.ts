@@ -1,100 +1,65 @@
-// apps/web/lib/ai/providers/anthropic.ts
+import Anthropic from '@anthropic-ai/sdk';
 import { TAILOR_RESUME_SYSTEM } from '@/lib/ai/prompts/tailor';
 import { parseAndNormalizeLLMTextOrThrow, TailoredResume } from '@/lib/generators/tailorResume';
 import { compactText } from '@/lib/ai/compact';
+import { pickModel } from '@/lib/ai/modelMap';
 
 export async function anthropicTailorResume({
   jobDescription,
   resumeText,
   model,
-}: { jobDescription: string; resumeText: string; model: string; }): Promise<TailoredResume> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw Object.assign(new Error('Missing ANTHROPIC_API_KEY'), { code: 'CONFIG_MISSING' });
+}: { jobDescription: string; resumeText: string; model?: string; }): Promise<TailoredResume> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw Object.assign(new Error('Missing ANTHROPIC_API_KEY'), { code: 'CONFIG_MISSING' });
 
-  // Compact inputs to avoid token limits
+  const finalModel = pickModel('anthropic', model);
+  const client = new Anthropic({ apiKey: key });
+
   const jd = compactText(jobDescription, 8000);
   const rez = compactText(resumeText, 16000);
 
+  const system = TAILOR_RESUME_SYSTEM + '\nReturn ONLY a JSON object. No markdown fences, no extra text.';
+  const user = [
+    '--- ORIGINAL RESUME ---', rez,
+    '',
+    '--- JOB DESCRIPTION ---', jd,
+    '',
+    'Output strictly valid JSON with the required keys.'
+  ].join('\n');
+
   try {
-    // Claude 3 API call
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4000,
-        system: TAILOR_RESUME_SYSTEM,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: [
-                '--- ORIGINAL RESUME ---',
-                rez,
-                '',
-                '--- JOB DESCRIPTION ---',
-                jd
-              ].join('\n')
-            }
-          ]
-        }],
-        response_format: { type: "json" } // Force JSON mode for Claude 3
-      }),
+    // Do NOT send response_format unless you know your SDK supports it; some versions 400.
+    const msg = await client.messages.create({
+      model: finalModel,
+      max_tokens: 2000,
+      temperature: 0.2,
+      system,
+      messages: [{ role: 'user', content: user }],
     });
 
-    const json = await res.json().catch(() => ({}));
-    const text = json?.content?.[0]?.text ?? '';
-
-    // Handle API errors
-    if (!res.ok) {
-      const msg = String(json?.error?.message ?? 'Anthropic error');
-      const status = res.status;
-
-      // Handle specific error types
-      if (status === 429 || /rate.*limit|quota/i.test(msg)) {
-        const e: any = new Error('RATE_LIMIT');
-        e.code = 'RATE_LIMIT';
-        e.status = 429;
-        e.retryAfter = Number(res.headers.get('retry-after')) || 3;
-        e.raw = msg;
-        throw e;
-      }
-
-      if (status === 401 || /invalid.*api.*key|auth/i.test(msg)) {
-        const e: any = new Error('AUTH_ERROR');
-        e.code = 'AUTH_ERROR';
-        e.raw = msg;
-        throw e;
-      }
-
-      const err: any = new Error(msg);
-      err.code = 'API_ERROR';
-      err.status = status;
-      err.raw = JSON.stringify(json).slice(0, 1000);
-      throw err;
-    }
-
-    // Handle empty responses
-    if (!text?.trim()) {
+    const text = msg.content?.[0]?.type === 'text' ? msg.content[0].text : '';
+    if (!text.trim()) {
       const e: any = new Error('MODEL_EMPTY_OUTPUT');
       e.code = 'MODEL_EMPTY_OUTPUT';
       throw e;
     }
-
     return parseAndNormalizeLLMTextOrThrow(text);
   } catch (err: any) {
-    // Pass through known errors
-    if (err.code) throw err;
+    const msg = String(err?.message ?? '');
+    const status = err?.status;
 
-    // Wrap unknown errors
-    const wrapped: any = new Error(err.message || 'Anthropic error');
-    wrapped.code = 'UNEXPECTED_ERROR';
-    wrapped.raw = err.raw || String(err);
-    throw wrapped;
+    if (status === 400 && /response_format/i.test(msg)) {
+      const e: any = new Error('PARAM_NOT_SUPPORTED');
+      e.code = 'PARAM_NOT_SUPPORTED';
+      e.hint = 'Anthropic SDK does not support response_format. Removed.';
+      throw e;
+    }
+    if (status === 404) {
+      const e: any = new Error('MODEL_NOT_FOUND');
+      e.code = 'MODEL_NOT_FOUND';
+      e.hint = `Requested "${model}", using "${finalModel}" for Anthropic.`;
+      throw e;
+    }
+    throw err;
   }
 }
