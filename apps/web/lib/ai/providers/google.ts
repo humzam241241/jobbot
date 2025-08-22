@@ -13,7 +13,7 @@ export class GoogleProvider implements Provider {
   constructor() {
     const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
     this.baseUrl = process.env.GOOGLE_GENAI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
-    this.defaultModel = 'gemini-2.5-pro'; // Default to Gemini 2.5 Pro
+    this.defaultModel = 'gemini-2.5-pro';
 
     if (apiKey) {
       try {
@@ -45,18 +45,16 @@ export class GoogleProvider implements Provider {
 
     const model = input.model || this.defaultModel;
     const temperature = input.temperature || 0.2;
-    const timeoutMs = input.timeoutMs || 60000; // Default 60s timeout
+    const timeoutMs = input.timeoutMs || 60000;
     
     try {
       logger.info(`Generating with Google model ${model}`, { temperature });
       
-      // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       const geminiModel = this.client!.getGenerativeModel({ model });
       
-      // Attempt to use the most robust JSON generation method available
       let response;
       try {
         // Try with responseSchema (Gemini 2.5+ feature)
@@ -116,21 +114,35 @@ export class GoogleProvider implements Provider {
         }, { signal: controller.signal as any });
       }
       
-      // Clear timeout
       clearTimeout(timeoutId);
       
-      // Parse JSON response
-      const content = response.response.text() || '{}';
-      let jsonResult;
-      
-      try {
-        jsonResult = JSON.parse(content);
-      } catch (parseError) {
-        logger.error('Failed to parse JSON response', { error: parseError, content });
+      // Get response text and try to parse as JSON
+      const text = response.response.text();
+      if (!text) {
         throw new AIProviderError({
-          code: 'SERVER',
-          message: 'Failed to parse JSON response from Google',
-          details: { content },
+          code: 'EMPTY_RESPONSE',
+          message: 'Google model returned empty response',
+        });
+      }
+
+      // Try to extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new AIProviderError({
+          code: 'NO_JSON_FOUND',
+          message: 'Could not find JSON object in response',
+          details: { preview: text.slice(0, 500) },
+        });
+      }
+
+      let jsonResult;
+      try {
+        jsonResult = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        throw new AIProviderError({
+          code: 'INVALID_JSON',
+          message: 'Failed to parse JSON response',
+          details: { preview: jsonMatch[0].slice(0, 500) },
         });
       }
       
@@ -144,7 +156,7 @@ export class GoogleProvider implements Provider {
         if (!tokensUsed) {
           // Estimate tokens based on text length (rough approximation)
           const promptText = input.prompt || '';
-          const responseText = content || '';
+          const responseText = text || '';
           const totalChars = promptText.length + responseText.length;
           tokensUsed = Math.ceil(totalChars / 4); // ~4 chars per token
         }
@@ -159,58 +171,51 @@ export class GoogleProvider implements Provider {
           }
         };
       } catch (validationError) {
-        logger.error('Schema validation failed for Google response', { error: validationError, json: jsonResult });
         throw new AIProviderError({
-          code: 'SERVER',
-          message: 'Google response did not match expected schema',
-          details: { validationError, json: jsonResult },
+          code: 'SCHEMA_VALIDATION',
+          message: 'Response did not match expected schema',
+          details: { 
+            error: validationError,
+            preview: JSON.stringify(jsonResult).slice(0, 500)
+          },
         });
       }
     } catch (error: any) {
       // Handle timeout
       if (error.name === 'AbortError') {
-        logger.error('Google request timed out', { timeoutMs });
         throw new AIProviderError({
           code: 'TIMEOUT',
-          message: `Google request timed out after ${timeoutMs}ms`,
+          message: `Request timed out after ${timeoutMs}ms`,
         });
       }
       
       // Handle rate limiting
       if (error.status === 429 || (error.message && error.message.includes('quota'))) {
-        logger.error('Google rate limit or quota exceeded', { error });
         throw new AIProviderError({
           code: 'RATE_LIMIT',
-          message: 'Google rate limit or quota exceeded',
+          message: 'Rate limit or quota exceeded',
           details: error,
         });
       }
       
       // Handle authentication errors
       if (error.status === 401 || (error.message && error.message.includes('auth'))) {
-        logger.error('Google authentication failed', { error });
         throw new AIProviderError({
           code: 'AUTH',
-          message: 'Google authentication failed',
+          message: 'Authentication failed',
           details: error,
         });
       }
       
-      // Handle server errors
-      if (error.status && error.status >= 500) {
-        logger.error('Google server error', { error });
-        throw new AIProviderError({
-          code: 'SERVER',
-          message: 'Google server error',
-          details: error,
-        });
+      // If it's already an AIProviderError, rethrow
+      if (error instanceof AIProviderError) {
+        throw error;
       }
       
       // Handle other errors
-      logger.error('Unknown Google error', { error });
       throw new AIProviderError({
         code: 'UNKNOWN',
-        message: error.message || 'Unknown Google error',
+        message: error.message || 'Unknown error',
         details: error,
       });
     }

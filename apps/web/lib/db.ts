@@ -1,12 +1,22 @@
 import { PrismaClient } from '@prisma/client';
 
-// Use a single instance of Prisma Client in development
-declare global {
-  var prisma: PrismaClient | undefined;
+let prisma: PrismaClient | null = null;
+
+function validPgUrl(url?: string) {
+  return !!url && /^postgres(ql)?:\/\//i.test(url);
 }
 
-export const prisma = global.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
+/** Returns a Prisma client or null (in-memory fallback mode) */
+export function getDbOrNull() {
+  if (process.env.SKIP_DB === '1') return null;
+  const url = process.env.DATABASE_URL;
+  if (!validPgUrl(url)) {
+    console.warn('[db] Invalid DATABASE_URL format - running in no-DB mode');
+    return null;
+  }
+  if (!prisma) prisma = new PrismaClient();
+  return prisma;
 }
+
+// For backwards compatibility
+export const prisma = getDbOrNull();

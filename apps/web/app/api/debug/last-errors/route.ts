@@ -1,55 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createDevLogger } from '@/lib/utils/devLogger';
 
-// Keep a small in-memory buffer of recent errors
-const MAX_ERRORS = 50;
-const recentErrors: any[] = [];
+const logger = createDevLogger('debug:last-errors');
 
-export function addError(error: any) {
-  recentErrors.unshift({
-    timestamp: new Date().toISOString(),
-    ...error
-  });
-  
-  if (recentErrors.length > MAX_ERRORS) {
-    recentErrors.pop();
+// Ring buffer of last 10 errors
+const errorBuffer: Array<{
+  timestamp: number;
+  id: string;
+  error: string;
+  details?: any;
+}> = [];
+
+const MAX_ERRORS = 10;
+
+export function recordError(id: string, error: any) {
+  const errorEntry = {
+    timestamp: Date.now(),
+    id,
+    error: error?.message || String(error),
+    details: {
+      code: error?.code,
+      provider: error?.provider,
+      model: error?.model,
+      stage: error?.stage,
+    },
+  };
+
+  // Add to ring buffer
+  errorBuffer.unshift(errorEntry);
+  if (errorBuffer.length > MAX_ERRORS) {
+    errorBuffer.pop();
   }
+
+  logger.error(`Error recorded [${id}]`, error);
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    // Check if a specific traceId was requested
-    const { searchParams } = new URL(req.url);
-    const traceId = searchParams.get('traceId');
-    
-    if (traceId) {
-      // Try to read the specific log file
-      const debugDir = path.join(process.cwd(), 'debug');
-      const logPath = path.join(debugDir, `${traceId}.log`);
-      
-      if (fs.existsSync(logPath)) {
-        const content = fs.readFileSync(logPath, 'utf8');
-        const lines = content.split('\n').filter(Boolean);
-        const entries = lines.map(line => JSON.parse(line));
-        
-        return NextResponse.json({
-          traceId,
-          entries
-        });
-      } else {
-        return NextResponse.json({ error: 'Log not found' }, { status: 404 });
-      }
-    }
-    
-    // Return the in-memory error buffer
-    return NextResponse.json({
-      errors: recentErrors
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: 'Failed to retrieve logs', details: error.message },
-      { status: 500 }
-    );
+  // Only available in development
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ errors: [] });
   }
+
+  return NextResponse.json({
+    errors: errorBuffer.map(e => ({
+      ...e,
+      timestamp: new Date(e.timestamp).toISOString(),
+    })),
+  });
 }
