@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getDbOrNull } from '@/lib/db';
 import { recordGeneration, getUserUsage, hasReachedLimit } from '@/lib/usage';
-import { tailorResume } from '@/lib/generators/tailorResume';
-import { tailorCoverLetter } from '@/lib/generators/tailorCoverLetter';
 import { createDevLogger } from "@/lib/utils/devLogger";
 import { recordError } from '../../debug/last-errors/route';
+import { googleTailorResume } from '@/lib/ai/providers/google';
+import { openaiTailorResume } from '@/lib/ai/providers/openai';
+import { anthropicTailorResume } from '@/lib/ai/providers/anthropic';
 
 const logger = createDevLogger("api:resume:generate");
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       usage: getUserUsage(),
     }, { status: 429 });
   }
-
+  
   try {
     const result = await parseBody(req);
     if ('error' in result) {
@@ -69,144 +70,79 @@ export async function POST(req: NextRequest) {
         ...result.error 
       }, { status: 400 });
     }
-
+    
     const { jobDescription, jobUrl, provider, model, resume } = result.data;
+    const resumeText = resume ? await resume.text() : '';
     const userId = 'anon'; // Replace with session user if available
     const db = getDbOrNull();
 
-    // 1) Tailor resume
-    let tr;
+    let tailoredResult;
     try {
-      logger.info(`Tailoring resume [${reqId}]`);
-      tr = await tailorResume({ 
-        requested: { provider, model },
-        masterResume: resume ? await resume.text() : '',
-        jobDescription,
-        preserveFormat: true
-      });
-      logger.info(`Resume tailoring successful using ${tr.provider}/${tr.model} [${reqId}]`);
-      
-      // Record successful generation
-      await recordGeneration({
-        traceId: reqId,
-        userId,
-        provider: tr.provider,
-        type: 'resume',
-        status: 'success',
-        inputChars: jobDescription.length + (resume ? await resume.text().then(t => t.length) : 0),
-        outputChars: JSON.stringify(tr.result).length,
-        inputTokens: tr.tokenUsage?.inputTokens,
-        outputTokens: tr.tokenUsage?.outputTokens,
-        estimatedTokens: tr.tokenUsage?.estimatedTokens,
-        transaction: db
-      }).catch(e => logger.warn('Failed to record generation', e));
-    } catch (e: any) {
-      logger.error(`Resume tailoring failed [${reqId}]`, e);
-      recordError(reqId, e);
-      
-      // Record failed generation
-      await recordGeneration({
-        traceId: reqId,
-        userId,
-        provider: e?.provider || provider || 'unknown',
-        type: 'resume',
-        status: 'error',
-        inputChars: jobDescription.length + (resume ? await resume.text().then(t => t.length) : 0),
-        errorMessage: e?.message || 'Unknown error',
-        transaction: db
-      }).catch(err => logger.warn('Failed to record generation error', err));
-      
-      return NextResponse.json({ 
-        ok: false,
-        id: reqId,
-        error: 'TAILORING_FAILED', 
-        stage: 'resume', 
-        details: e?.code || e?.message, 
-        preview: e?.preview,
-        provider: e?.provider,
-        model: e?.model,
-      }, { status: 422 });
-    }
-
-    // 2) Generate cover letter
-    let cl;
-    try {
-      logger.info(`Generating cover letter [${reqId}]`);
-      cl = await tailorCoverLetter({ 
-        requested: { provider, model },
-        tailoredResume: tr.result,
-        jobDescription,
-        jobUrl
-      });
-      logger.info(`Cover letter generation successful using ${cl.provider}/${cl.model} [${reqId}]`);
-      
-      // Record successful generation
-      await recordGeneration({
-        traceId: reqId,
-        userId,
-        provider: cl.provider,
-        type: 'cover_letter',
-        status: 'success',
-        inputChars: jobDescription.length + JSON.stringify(tr.result).length,
-        outputChars: JSON.stringify(cl.result).length,
-        inputTokens: cl.tokenUsage?.inputTokens,
-        outputTokens: cl.tokenUsage?.outputTokens,
-        estimatedTokens: cl.tokenUsage?.estimatedTokens,
-        transaction: db
-      }).catch(e => logger.warn('Failed to record generation', e));
-    } catch (e: any) {
-      logger.error(`Cover letter generation failed [${reqId}]`, e);
-      recordError(reqId, e);
-      
-      // Record failed generation
-      await recordGeneration({
-        traceId: reqId,
-        userId,
-        provider: e?.provider || provider || 'unknown',
-        type: 'cover_letter',
-        status: 'error',
-        inputChars: jobDescription.length + JSON.stringify(tr.result).length,
-        errorMessage: e?.message || 'Unknown error',
-        transaction: db
-      }).catch(err => logger.warn('Failed to record generation error', err));
-      
-      return NextResponse.json({ 
-        ok: false,
-        id: reqId,
-        error: 'COVER_LETTER_FAILED', 
-        stage: 'cover-letter', 
-        details: e?.code || e?.message, 
-        preview: e?.preview,
-        provider: e?.provider,
-        model: e?.model,
-      }, { status: 422 });
-    }
-
-    // Get usage data (won't fail if DB is unavailable)
-    const usage = getUserUsage(userId);
-    
-    logger.info(`Resume generation complete [${reqId}], usage=${usage.count}/${usage.limit}`);
-    return NextResponse.json({
-      ok: true,
-      id: reqId,
-      provider: { 
-        resume: { provider: tr.provider, model: tr.model }, 
-        coverLetter: { provider: cl.provider, model: cl.model } 
-      },
-      tailored: { 
-        resume: tr.result, 
-        coverLetter: cl.result 
-      },
-      usage: {
-        count: usage.count,
-        limit: usage.limit,
-        remaining: usage.remaining,
-        tokenUsage: {
-          resume: tr.tokenUsage,
-          coverLetter: cl.tokenUsage
+      if (provider === 'google') {
+        tailoredResult = await googleTailorResume({ jobDescription, resumeText, model });
+      } else if (provider === 'openai') {
+        tailoredResult = await openaiTailorResume({ jobDescription, resumeText, model });
+      } else if (provider === 'anthropic') {
+        tailoredResult = await anthropicTailorResume({ jobDescription, resumeText, model });
+      } else {
+        // auto: try Google → OpenAI → Anthropic
+        try {
+          tailoredResult = await googleTailorResume({ jobDescription, resumeText, model });
+        } catch (e) {
+          try {
+            tailoredResult = await openaiTailorResume({ jobDescription, resumeText, model });
+          } catch (e) {
+            tailoredResult = await anthropicTailorResume({ jobDescription, resumeText, model });
+          }
         }
       }
-    }, { status: 200 });
+
+      // Record successful generation
+      await recordGeneration({
+        traceId: reqId,
+        userId,
+        provider,
+        type: 'resume',
+        status: 'success',
+        inputChars: jobDescription.length + resumeText.length,
+        outputChars: JSON.stringify(tailoredResult).length,
+        transaction: db
+      }).catch(e => logger.warn('Failed to record generation', e));
+
+      // Get usage data (won't fail if DB is unavailable)
+      const usage = getUserUsage(userId);
+      
+      return NextResponse.json({
+        ok: true,
+        id: reqId,
+        result: tailoredResult,
+        usage
+      }, { status: 200 });
+
+    } catch (e: any) {
+      logger.error(`Generation failed [${reqId}]`, e);
+      recordError(reqId, e);
+      
+      // Record failed generation
+      await recordGeneration({
+        traceId: reqId,
+        userId,
+        provider: e?.provider || provider || 'unknown',
+        type: 'resume',
+        status: 'error',
+        inputChars: jobDescription.length + resumeText.length,
+        errorMessage: e?.message || 'Unknown error',
+        transaction: db
+      }).catch(err => logger.warn('Failed to record generation error', err));
+      
+      return NextResponse.json({ 
+        ok: false,
+        id: reqId,
+        error: e?.code || 'GENERATION_FAILED',
+        message: e?.message || 'Failed to generate resume',
+        preview: e?.preview,
+      }, { status: 422 });
+    }
   } catch (err: any) {
     logger.error(`Unexpected error [${reqId}]`, err);
     recordError(reqId, err);
