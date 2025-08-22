@@ -10,7 +10,15 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "typecheck": "tsc -b --pretty false",
     "clean": "rimraf ./**/node_modules/.cache",
-    "test": "pnpm --filter @app/web test"
+    "test": "pnpm --filter @app/web test",
+    "dev:win": "scripts/dev.bat",
+    "build:win": "scripts/build.bat",
+    "start:win": "scripts/start.bat",
+    "db:reset:win": "scripts/db.bat reset",
+    "db:migrate:win": "scripts/db.bat migrate",
+    "db:seed:win": "scripts/db.bat seed",
+    "db:generate:win": "scripts/db.bat generate",
+    "port-kill": "scripts/port-kill.bat 3000"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.1",

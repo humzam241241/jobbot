@@ -22,32 +22,68 @@ JobBot is a full-stack application that helps job seekers optimize their resumes
 ### Prerequisites
 
 - Node.js v18 or later
-- PNPM package manager
+- PNPM package manager (`npm install -g pnpm`)
 - PostgreSQL database
+- Git
 
-### All-in-One Setup Menu
+## Windows Quickstart
 
-For the easiest experience, run the all-in-one menu:
+JobBot includes standardized Windows scripts for easy development and deployment.
+
+### Quick Commands
+
 ```bash
-jobbot-all-in-one.bat
+# Start development server
+npm run dev:win
+
+# Build for production
+npm run build:win
+
+# Start production server
+npm run start:win
+
+# Database commands
+npm run db:reset:win    # Reset database (WARNING: deletes all data)
+npm run db:migrate:win  # Run pending migrations
+npm run db:seed:win     # Seed database with initial data
+npm run db:generate:win # Generate Prisma client
+
+# Free up port 3000 if busy
+npm run port-kill
 ```
 
-This interactive menu provides access to all setup and maintenance options:
-1. Quick Setup and Start
-2. Fix Database Connection
-3. Clean Repository
-4. Update Dependencies
-5. Start JobBot
+### Common Issues and Fixes
 
-### Individual Scripts
+#### Port 3000 is in use
+```bash
+npm run port-kill
+```
 
-You can also run individual scripts directly:
+#### Database connection issues
+- Check that PostgreSQL is running
+- Verify DATABASE_URL format in .env and .env.local files:
+  ```
+  DATABASE_URL=postgres://postgres:postgres@localhost:5432/jobbot
+  ```
+  Note: Use `postgres://` protocol, not `postgresql://`
+- Create the database manually if needed:
+  ```bash
+  psql -U postgres -c "CREATE DATABASE jobbot;"
+  ```
+- Regenerate Prisma client:
+  ```bash
+  npm run db:generate:win
+  ```
 
-- **jobbot-setup.bat** - Complete setup (environment, dependencies, database)
-- **fix-database.bat** - Fixes database connection issues
-- **cleanup-repo.bat** - Cleans up redundant files and caches
-- **update-deps.bat** - Updates dependencies to their latest versions
-- **start-jobbot.bat** - Starts the application without setup
+#### Missing dependencies
+- Run the development script which will install dependencies automatically:
+  ```bash
+  npm run dev:win
+  ```
+- Or install manually:
+  ```bash
+  pnpm install
+  ```
 
 ### Manual Setup
 
