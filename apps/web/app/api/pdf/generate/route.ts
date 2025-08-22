@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { renderToStaticMarkup } from 'react-dom/server';
-import { generatePdfFromHtml } from "@/lib/pdf/serverRenderer";
+import "server-only";
+import { renderToPdf } from "@/lib/pipeline/renderToPdf";
 import { createLogger } from "@/lib/logger";
-import MasterResume from "@/components/resume/MasterResume";
-import CoverLetter from "@/components/resume/CoverLetter";
-import ATSReport from "@/components/resume/ATSReport";
 
 const logger = createLogger('pdf-api');
 
@@ -13,35 +10,25 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { component, props, options } = data;
 
-    let html = '';
+    // Generate PDF directly from HTML
+    const { html } = data;
     
-    // Render the appropriate component
-    switch (component) {
-      case 'resume':
-        html = renderToStaticMarkup(<MasterResume {...props} />);
-        break;
-      case 'coverLetter':
-        html = renderToStaticMarkup(<CoverLetter {...props} />);
-        break;
-      case 'atsReport':
-        html = renderToStaticMarkup(<ATSReport {...props} />);
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid component type' }, { status: 400 });
+    if (!html || typeof html !== 'string') {
+      return NextResponse.json({ error: 'HTML content is required' }, { status: 400 });
     }
-
+    
     // Generate PDF
-    const { buffer, filePath } = await generatePdfFromHtml(html, options);
+    const result = await renderToPdf({
+      html,
+      title: options?.title || 'Document',
+      fileName: options?.fileName || `document_${Date.now()}.pdf`
+    });
 
-    // If we have a file path, return the URL, otherwise return the buffer as base64
-    const pdfUrl = filePath 
-      ? `/resumes/${filePath.split('resumes/')[1]}`
-      : `data:application/pdf;base64,${buffer.toString('base64')}`;
-
+    // Return the URL path
     return NextResponse.json({
       ok: true,
-      url: pdfUrl,
-      fileName: options.fileName
+      url: result.urlPath,
+      fileName: options?.fileName || `document_${Date.now()}.pdf`
     });
 
   } catch (error: any) {

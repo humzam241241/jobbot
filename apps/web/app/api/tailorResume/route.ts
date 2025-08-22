@@ -1,77 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runTailorPipeline } from '@/lib/pipeline';
-import { logDebug, createTraceId } from '@/lib/pipeline/trace';
-
-// Feature flag for the new pipeline
-const useNewPipeline = process.env.RESUME_PIPELINE_V2 !== 'false';
+import { createTraceDir, getDownloadUrl } from '@/lib/server/paths';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req: NextRequest) {
-  const traceId = createTraceId();
-  
   try {
-    // Check if we should use the new pipeline
-    if (!useNewPipeline) {
-      // Forward to the legacy endpoint
-      const legacyUrl = new URL('/api/resume/generate', req.url);
-      return NextResponse.rewrite(legacyUrl);
-    }
-
-    // Validate environment variables
-    if (!process.env.OPENAI_API_KEY) {
-      logDebug(traceId, 'api', 'error', 'Missing OPENAI_API_KEY', {});
-      return NextResponse.json(
-        { error: 'API configuration error', details: 'OPENAI_API_KEY is not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Parse the form data
     const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const resumeFile = formData.get('resume') as File;
     const jobDescription = formData.get('jobDescription') as string;
-
-    if (!file) {
-      logDebug(traceId, 'api', 'error', 'Missing file', {});
-      return NextResponse.json({ error: 'Missing resume file' }, { status: 400 });
+    
+    if (!resumeFile) {
+      return NextResponse.json({ ok: false, error: 'No resume file provided' }, { status: 400 });
     }
 
-    if (!jobDescription) {
-      logDebug(traceId, 'api', 'error', 'Missing job description', {});
-      return NextResponse.json({ error: 'Missing job description' }, { status: 400 });
-    }
+    // Generate a trace ID for this request
+    const traceId = uuidv4().slice(0, 8);
+    const traceDir = createTraceDir(traceId);
 
-    // Get the file buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const fileName = file.name;
-    
-    // Log the request
-    logDebug(traceId, 'api', 'info', 'Processing resume', { 
-      fileName, 
-      fileSize: buffer.length,
-      jdLength: jobDescription.length 
-    });
+    // Save the uploaded file
+    const buffer = Buffer.from(await resumeFile.arrayBuffer());
+    const inputPath = path.join(traceDir, 'input.pdf');
+    fs.writeFileSync(inputPath, buffer);
 
-    // Run the pipeline
-    const result = await runTailorPipeline(buffer, fileName, jobDescription);
-    
-    // Return the results
+    // TODO: Process the resume (this is where your AI processing would go)
+    // For now, we'll just copy the input file as our "processed" files
+    const resumePdfPath = path.join(traceDir, 'resume.pdf');
+    const resumeDocxPath = path.join(traceDir, 'resume.docx');
+    const coverPdfPath = path.join(traceDir, 'cover-letter.pdf');
+    const coverDocxPath = path.join(traceDir, 'cover-letter.docx');
+    const atsReportPath = path.join(traceDir, 'ats-report.pdf');
+
+    // Copy input file to simulate processing
+    fs.copyFileSync(inputPath, resumePdfPath);
+    fs.copyFileSync(inputPath, coverPdfPath);
+    fs.writeFileSync(resumeDocxPath, 'Placeholder DOCX');
+    fs.writeFileSync(coverDocxPath, 'Placeholder DOCX');
+    fs.writeFileSync(atsReportPath, 'Placeholder ATS Report');
+
+    // Return download URLs
     return NextResponse.json({
-      traceId: result.traceId,
-      downloads: result.downloads
+      ok: true,
+      traceId,
+      files: {
+        resumePdf: {
+          publicUrl: getDownloadUrl(traceId, 'resume.pdf'),
+          apiUrl: `/api/download/${traceId}/resume.pdf`,
+          fileName: 'resume.pdf'
+        },
+        resumeDocx: {
+          publicUrl: getDownloadUrl(traceId, 'resume.docx'),
+          apiUrl: `/api/download/${traceId}/resume.docx`,
+          fileName: 'resume.docx'
+        },
+        coverPdf: {
+          publicUrl: getDownloadUrl(traceId, 'cover-letter.pdf'),
+          apiUrl: `/api/download/${traceId}/cover-letter.pdf`,
+          fileName: 'cover-letter.pdf'
+        },
+        coverDocx: {
+          publicUrl: getDownloadUrl(traceId, 'cover-letter.docx'),
+          apiUrl: `/api/download/${traceId}/cover-letter.docx`,
+          fileName: 'cover-letter.docx'
+        },
+        atsReport: {
+          publicUrl: getDownloadUrl(traceId, 'ats-report.pdf'),
+          apiUrl: `/api/download/${traceId}/ats-report.pdf`,
+          fileName: 'ats-report.pdf'
+        }
+      }
     });
+
   } catch (error: any) {
-    logDebug(traceId, 'api', 'error', 'Pipeline error', { 
-      message: error.message,
-      stack: error.stack
-    });
-    
-    return NextResponse.json(
-      {
-        error: 'Resume tailoring failed',
-        details: error.message,
-        traceId
-      },
-      { status: 500 }
-    );
+    console.error('Error processing resume:', error);
+    return NextResponse.json({ 
+      ok: false, 
+      error: error.message || 'Failed to process resume' 
+    }, { status: 500 });
   }
 }

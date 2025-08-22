@@ -1,6 +1,6 @@
 // apps/web/app/api/extract/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { extractJob, BlockedExtractionError } from '@server/services/extractJob'; // adjust alias if needed
+import { extractJob, BlockedExtractionError } from '@/lib/services/extractJob';
 
 export async function POST(req: NextRequest) {
   const body = await req.json(); // { url?: string, jdText?: string }

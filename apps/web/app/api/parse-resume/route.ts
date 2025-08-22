@@ -4,11 +4,7 @@ import { promises as fs } from "fs";
 import mammoth from "mammoth";
 import pdf from "pdf-parse";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {

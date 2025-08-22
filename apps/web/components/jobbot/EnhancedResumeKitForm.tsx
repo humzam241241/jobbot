@@ -1,407 +1,383 @@
 "use client";
 
-import { useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { GenerationStep } from '@/lib/types/resume';
-import GenerationStepper from '@/components/ui/GenerationStepper';
-import { DocumentArrowUpIcon, DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useLocalStorage } from "react-use";
+import React, { useState } from "react";
+import FileUpload from "@/components/ui/FileUpload";
+import ErrorCard from "@/components/ui/ErrorCard";
+import ModelSelector from "@/components/ui/ModelSelector";
+import { createDevLogger } from "@/lib/utils/devLogger";
 
-interface FileUrls {
-  publicUrl: string;
-  apiUrl: string;
-  fileName: string;
-}
-
-interface GeneratedFiles {
-  resumePdf: FileUrls;
-  resumeDocx: FileUrls;
-  coverPdf: FileUrls;
-  coverDocx: FileUrls;
-  atsPdf: FileUrls;
-}
+const logger = createDevLogger("ui:resumeKitForm");
 
 interface GenerationResult {
   ok: boolean;
   traceId: string;
-  files: GeneratedFiles;
+  links: {
+    resumePdf: string;
+    resumeDocx: string;
+    coverLetterPdf?: string;
+    coverLetterDocx?: string;
+    atsReportPdf?: string;
+  };
+  score?: number;
 }
 
-const GENERATION_STEPS: GenerationStep[] = [
-  {
-    id: 'parse',
-    label: 'Parse Files',
-    description: 'Extracting content from uploaded files',
-    status: 'pending'
-  },
-  {
-    id: 'analyze',
-    label: 'Analyze Content',
-    description: 'Processing resume and job description',
-    status: 'pending'
-  },
-  {
-    id: 'tailor',
-    label: 'Tailor Content',
-    description: 'Customizing resume for the job',
-    status: 'pending'
-  },
-  {
-    id: 'format',
-    label: 'Format Documents',
-    description: 'Optimizing layout and styling',
-    status: 'pending'
-  },
-  {
-    id: 'ats',
-    label: 'ATS Analysis',
-    description: 'Calculating match score and suggestions',
-    status: 'pending'
-  },
-  {
-    id: 'generate',
-    label: 'Generate Files',
-    description: 'Creating final documents',
-    status: 'pending'
-  }
-];
+type Provider = 'openai' | 'anthropic' | 'gemini' | 'auto';
 
 export default function EnhancedResumeKitForm() {
-  const [masterResumeText, setMasterResumeText] = useState("");
-  const [jobUrl, setJobUrl] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [provider, setProvider] = useState('auto');
-  const [model, setModel] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [currentStep, setCurrentStep] = useState<string>('');
-  const [steps, setSteps] = useState<GenerationStep[]>(GENERATION_STEPS);
-  const [jobDescriptionText, setJobDescriptionText] = useState("");
-  const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
-  
-  // Generation counter
-  const [generationCount, setGenerationCount] = useLocalStorage<number>("generationCount", 0);
+  const [errorDetails, setErrorDetails] = useState<{
+    code?: string;
+    hint?: string;
+    provider?: string;
+    model?: string;
+    rawPreview?: string;
+    baselineResumePdfBase64?: string;
+    developerHint?: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<Provider>("auto");
+  const [selectedModel, setSelectedModel] = useState<string>("auto");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"error" | "success" | "info">("error");
 
-  // Available models per provider (keep small, can be expanded)
-  const MODEL_SETS: Record<string, { value: string; label: string }[]> = {
-    openai: [
-      { value: 'gpt-4o', label: 'GPT-4o' },
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    ],
-    anthropic: [
-      { value: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet' },
-      { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
-    ],
-    gemini: [
-      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-      { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    ],
-    openrouter: [
-      { value: 'openai/gpt-4o-mini', label: 'OpenRouter · OpenAI GPT-4o Mini' },
-      { value: 'deepseek/deepseek-chat', label: 'OpenRouter · DeepSeek Chat' },
-    ],
+  // Handle model selection change
+  const handleModelChange = (provider: Provider, model: string) => {
+    setSelectedProvider(provider);
+    setSelectedModel(model);
+    logger.info(`Selected ${provider}/${model}`);
   };
 
-  const handleDrop = (acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setResumeFile(acceptedFiles[0]);
-      setError(null);
-    }
-  };
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop: handleDrop, multiple: false });
-
-  const updateStepStatus = (stepId: string, status: GenerationStep['status'], progress?: number, error?: string) => {
-    setSteps(prev => prev.map(step => 
-      step.id === stepId 
-        ? { ...step, status, progress, error }
-        : step
-    ));
-  };
-
-  const handleGenerate = async () => {
-    if (!resumeFile && !masterResumeText) {
-      setError("Please upload a resume file or paste your resume text.");
-      return;
-    }
-    if (!jobUrl && !jobDescriptionText) {
-      setError("Please provide a job posting URL or paste the job description.");
-      return;
-    }
-
-    setIsLoading(true);
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
-    setGenerationResult(null);
-    
+    setErrorDetails(null);
+    setIsLoading(true);
+    setShowToast(false);
+    setResult(null);
+
     try {
-      const formData = new FormData();
-      if (resumeFile) {
-        formData.append("resumeFile", resumeFile);
-      }
-      formData.append("masterResumeText", masterResumeText);
-      formData.append("jobUrl", jobUrl || "");
-      if (jobDescriptionText) {
-        formData.append("jobDescriptionText", jobDescriptionText);
-      }
-      formData.append("notes", notes);
-      formData.append("provider", provider);
-      if (model) {
-        formData.append("model", model);
+      if (!selectedFile) {
+        setError("Please select a resume file");
+        setIsLoading(false);
+        return;
       }
 
-      const response = await fetch('/api/resume/generate', {
-        method: 'POST',
-        body: formData
-      });
+      const form = e.currentTarget;
+      const formData = new FormData(form);
+      formData.append("resume", selectedFile);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Resume generation failed');
+      const jdText = formData.get("jdText") as string;
+      if (!jdText.trim()) {
+        setError("Please enter a job description");
+        setIsLoading(false);
+        return;
       }
       
-      const result = await response.json();
-      if (!result.ok) {
-        throw new Error(result.error || 'Resume generation failed');
+      const jdUrl = formData.get("jdUrl") as string;
+      
+      try {
+        const response = await fetch("/api/resume/generate", {
+          method: "POST",
+          body: formData
+        });
+        
+        const json = await response.json();
+        
+        if (json.ok) {
+          // Success response
+          setResult(json);
+          
+          // Show success toast
+          setToastMessage("Resume kit generated successfully!");
+          setToastType("success");
+          setShowToast(true);
+          
+          // Auto-hide toast after 5 seconds
+          setTimeout(() => setShowToast(false), 5000);
+        } else {
+          // Error response
+          setError(json.message || "Failed to generate resume");
+          
+          // Set error details if available
+          if (json.code) {
+            setErrorDetails({
+              code: json.code,
+              hint: json.hint,
+              provider: json.provider,
+              model: json.model,
+              rawPreview: json.rawPreview,
+              developerHint: json.developerHint
+            });
+            
+            // Show specific toast for TAILOR_JSON_PARSE_FAILED
+            if (json.code === "TAILOR_JSON_PARSE_FAILED") {
+              setToastMessage("Model returned non-JSON. Try again or pick a different model.");
+              setToastType("error");
+              setShowToast(true);
+            }
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || "An error occurred");
+        logger.error("Error submitting form:", err);
       }
-
-      setGenerationResult(result);
-      setGenerationCount((prev) => (prev || 0) + 1);
-      setCurrentStep('done');
     } catch (err: any) {
-      console.error("Generation error:", err);
-      setError(err.message);
+      setError(err.message || "An error occurred");
+      logger.error("Error in onSubmit:", err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const renderDownloadButtons = () => {
-    if (!generationResult) return null;
+  // Function to dismiss the toast notification
+  function dismissToast() {
+    setShowToast(false);
+  }
 
-    const { files, traceId } = generationResult;
-    return (
-      <div className="space-y-6 mt-6">
-        <div className="text-xs text-gray-500">Trace ID: {traceId}</div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Resume */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium mb-2">Tailored Resume</h4>
-            <div className="flex flex-col gap-2">
-              <a 
-                href={files.resumePdf.publicUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-              >
-                View Resume (PDF)
-              </a>
-              <a 
-                href={files.resumeDocx.publicUrl}
-                download
-                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-              >
-                Download Resume (DOCX)
-              </a>
-              <div className="text-xs text-center text-gray-500">
-                <a href={files.resumePdf.apiUrl} className="hover:underline">PDF fallback</a>
-                {" · "}
-                <a href={files.resumeDocx.apiUrl} className="hover:underline">DOCX fallback</a>
-              </div>
-            </div>
-          </div>
+  // Function to retry with a different provider
+  function switchProvider() {
+    // If current provider is OpenAI, switch to Anthropic, else switch to OpenAI
+    const currentProvider = errorDetails?.provider?.toLowerCase() || "";
+    
+    if (currentProvider.includes("openai") || currentProvider.includes("gpt")) {
+      handleModelChange("anthropic", "claude-3-5-sonnet-latest");
+    } else if (currentProvider.includes("anthropic") || currentProvider.includes("claude")) {
+      handleModelChange("gemini", "gemini-2.5-pro");
+    } else {
+      handleModelChange("openai", "gpt-4o-2024-05-13");
+    }
+    
+    // Automatically submit the form with the new provider
+    setTimeout(() => {
+      const form = document.querySelector("form") as HTMLFormElement;
+      form.requestSubmit();
+    }, 100);
+  }
 
-          {/* Cover Letter */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium mb-2">Cover Letter</h4>
-            <div className="flex flex-col gap-2">
-              <a 
-                href={files.coverPdf.publicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-              >
-                View Cover Letter (PDF)
-              </a>
-              <a 
-                href={files.coverDocx.publicUrl}
-                download
-                className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-              >
-                Download Cover Letter (DOCX)
-              </a>
-              <div className="text-xs text-center text-gray-500">
-                <a href={files.coverPdf.apiUrl} className="hover:underline">PDF fallback</a>
-                {" · "}
-                <a href={files.coverDocx.apiUrl} className="hover:underline">DOCX fallback</a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ATS Report */}
-        <div className="border rounded-lg p-4">
-          <h4 className="font-medium mb-2">ATS Analysis</h4>
-          <div className="flex flex-col gap-2">
-            <a 
-              href={files.atsPdf.publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-            >
-              View ATS Report (PDF)
-            </a>
-            <div className="text-xs text-center text-gray-500">
-              <a href={files.atsPdf.apiUrl} className="hover:underline">PDF fallback</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Function to use baseline resume
+  function useBaselineResume() {
+    if (errorDetails?.baselineResumePdfBase64) {
+      // Create a blob from the base64 data
+      const byteCharacters = atob(errorDetails.baselineResumePdfBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      
+      // Create a URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Open the PDF in a new tab
+      window.open(url, '_blank');
+    }
+  }
 
   return (
-    <div className="rounded-2xl bg-card border border-border shadow-soft">
-      <div className="px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold text-muted-foreground">Resume Generator</h3>
+    <form onSubmit={onSubmit} className="space-y-6 text-white">
+      {/* Upload */}
+      <FileUpload
+        name="resume"
+        accept=".pdf,.docx"
+        maxSize={5 * 1024 * 1024}
+        label="Upload your resume (PDF or DOCX)"
+        onChange={setSelectedFile}
+        selectedFile={selectedFile}
+      />
+
+      {/* Job Description */}
+      <div className="space-y-2">
+        <label htmlFor="jdText" className="block text-sm font-medium text-gray-200">
+          Job Description
+        </label>
+        <textarea
+          id="jdText"
+          name="jdText"
+          rows={6}
+          className="mt-1 block w-full rounded-md bg-gray-800 border border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          placeholder="Paste the job description here..."
+          required
+        ></textarea>
       </div>
-      <div className="p-5 space-y-4">
-        {/* Dropzone */}
-        <div
-          {...getRootProps()}
-          className="flex h-36 items-center justify-center rounded-xl border border-dashed border-border bg-background/40 hover:bg-background/60 transition-colors cursor-pointer"
-        >
-          <input {...getInputProps()} />
-          <div className="text-center text-xs text-muted-foreground">
-            {resumeFile ? (
-              <span>Selected file: {resumeFile.name}</span>
-            ) : (
-              <>
-                Drag & drop your resume here, or click to select <br />
-                <span className="opacity-80">Supported: PDF, DOCX, TXT</span>
-              </>
+
+      {/* Optional Job URL */}
+      <div className="space-y-2">
+        <label htmlFor="jdUrl" className="block text-sm font-medium text-gray-200">
+          Job URL (optional)
+        </label>
+        <input
+          type="url"
+          id="jdUrl"
+          name="jdUrl"
+          className="mt-1 block w-full rounded-md bg-gray-800 border border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          placeholder="https://example.com/job-posting"
+        />
+      </div>
+
+      {/* AI Model Selection using ModelSelector component */}
+      <ModelSelector
+        defaultProvider={selectedProvider}
+        defaultModel={selectedModel}
+        onChange={handleModelChange}
+        disabled={isLoading}
+      />
+
+      {/* Hidden input for generation type - always generate full kit */}
+      <input type="hidden" name="mode" value="both" />
+
+      {/* Error display */}
+      {error && !errorDetails && (
+        <div className="rounded-lg border border-red-500 bg-red-900/20 p-3 text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Enhanced error display */}
+      {error && errorDetails && (
+        <ErrorCard
+          message={error}
+          hint={errorDetails.hint}
+          rawPreview={errorDetails.rawPreview}
+          code={errorDetails.code}
+          provider={errorDetails.provider}
+          model={errorDetails.model}
+          onRetry={() => {
+            const form = document.querySelector("form") as HTMLFormElement;
+            form.requestSubmit();
+          }}
+          onSwitchProvider={switchProvider}
+          onUseBaseline={useBaselineResume}
+          hasBaseline={!!errorDetails.baselineResumePdfBase64}
+        />
+      )}
+
+      <button 
+        type="submit" 
+        disabled={isLoading}
+        className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+      >
+        {isLoading ? "Generating Resume Kit..." : "Generate Resume Kit"}
+      </button>
+
+      {/* Results */}
+      {result?.ok && (
+        <div className="space-y-4 p-4 border border-emerald-500 rounded-lg bg-emerald-900/10">
+          <h3 className="text-lg font-medium text-emerald-400">Resume Kit Generated!</h3>
+          
+          <div className="text-xs text-gray-400">Trace ID: {result.traceId}</div>
+          
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-sm font-medium text-white mb-2">Resume</h4>
+              <div className="flex flex-wrap gap-2">
+                <a 
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-md text-sm font-medium text-white" 
+                  href={result.links.resumePdf} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View PDF
+                </a>
+                <a 
+                  className="px-3 py-2 border border-emerald-500 hover:bg-emerald-900/30 rounded-md text-sm font-medium text-emerald-300" 
+                  href={result.links.resumeDocx} 
+                  download
+                >
+                  Download DOCX
+                </a>
+              </div>
+            </div>
+            
+            {result.links.coverLetterPdf && (
+              <div>
+                <h4 className="text-sm font-medium text-white mb-2">Cover Letter</h4>
+                <div className="flex flex-wrap gap-2">
+                  <a 
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-md text-sm font-medium text-white" 
+                    href={result.links.coverLetterPdf} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    View PDF
+                  </a>
+                  {result.links.coverLetterDocx && (
+                    <a 
+                      className="px-3 py-2 border border-purple-500 hover:bg-purple-900/30 rounded-md text-sm font-medium text-purple-300" 
+                      href={result.links.coverLetterDocx} 
+                      download
+                    >
+                      Download DOCX
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {result.links.atsReportPdf && (
+              <div>
+                <h4 className="text-sm font-medium text-white mb-2">ATS Report</h4>
+                <div className="flex flex-wrap gap-2">
+                  <a 
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium text-white" 
+                    href={result.links.atsReportPdf} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    View Report
+                  </a>
+                </div>
+                {result.score !== undefined && (
+                  <div className="mt-2">
+                    <span className="text-sm">ATS Score: </span>
+                    <span className={`font-medium ${
+                      result.score >= 80 ? 'text-green-400' : 
+                      result.score >= 60 ? 'text-yellow-400' : 
+                      'text-red-400'
+                    }`}>
+                      {result.score}%
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
+      )}
 
-        {/* OR divider */}
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">or</span>
-          <div className="h-px flex-1 bg-border" />
+      {/* Toast Notification */}
+      {showToast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 z-50 ${
+          toastType === 'error' ? 'bg-red-500 text-white' :
+          toastType === 'success' ? 'bg-green-500 text-white' :
+          'bg-blue-500 text-white'
+        }`}>
+          {toastType === 'error' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          )}
+          {toastType === 'success' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          )}
+          {toastType === 'info' && (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          )}
+          <div>{toastMessage}</div>
+          <button onClick={dismissToast} className="ml-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
-
-        {/* Master resume text area */}
-        <textarea
-          className="min-h-[120px] w-full resize-y rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-          placeholder="Paste your resume text here…"
-          value={masterResumeText}
-          onChange={(e) => setMasterResumeText(e.target.value)}
-        />
-
-        {/* Job URL */}
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Job Posting URL</label>
-          <input
-            type="url"
-            inputMode="url"
-            className="w-full rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-            placeholder="Paste any job posting URL (e.g., company site, Lever, Greenhouse, Workday, LinkedIn)"
-            value={jobUrl}
-            onChange={(e) => setJobUrl(e.target.value)}
-          />
-        </div>
-
-        {/* Job Description Text */}
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">
-            {jobUrl ? "Extracted/Pasted Job Description" : "Paste Job Description"}
-          </label>
-          <textarea
-            className="min-h-[120px] w-full resize-y rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-            placeholder="For best results, paste the complete job description text here..."
-            value={jobDescriptionText}
-            onChange={(e) => setJobDescriptionText(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground/80">
-            Adding a detailed job description helps create more tailored resumes and cover letters.
-          </p>
-        </div>
-
-        {/* AI Provider Selection */}
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">AI Provider</label>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <select
-                className="w-full rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-                value={provider}
-                onChange={(e) => {
-                  setProvider(e.target.value);
-                  setModel(''); // Reset model when provider changes
-                }}
-              >
-                <option value="auto">Auto (Best Available)</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
-            </div>
-            <div>
-              <select
-                className="w-full rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                disabled={provider === 'auto'}
-              >
-                <option value="">Default Model</option>
-                {provider !== 'auto' && MODEL_SETS[provider]?.map(modelOption => (
-                  <option key={modelOption.value} value={modelOption.value}>
-                    {modelOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <textarea
-          className="min-h-[80px] w-full resize-y rounded-xl bg-background/40 border border-border px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-          placeholder="Any special instructions or focus areas…"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-        
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        {/* Generation Counter */}
-        <div className="flex justify-between items-center text-xs text-muted-foreground">
-          <span>Generations: {generationCount || 0}</span>
-          <span>{isLoading ? "Processing..." : ""}</span>
-        </div>
-
-        {/* Button */}
-        <button
-          className="w-full rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring/70 disabled:opacity-60 disabled:cursor-not-allowed"
-          onClick={handleGenerate}
-          disabled={isLoading}
-        >
-          {isLoading ? "Generating..." : "Generate Resume Kit"}
-        </button>
-
-        {/* Download Buttons */}
-        {renderDownloadButtons()}
-      </div>
-    </div>
+      )}
+    </form>
   );
 }

@@ -1,377 +1,219 @@
 "use client";
 
 import React from 'react';
+import { Profile } from '@/lib/schemas/profile';
 
-export interface KeywordMatch {
-  keyword: string;
-  present: boolean;
-  frequency?: number;
-  importance: 'High' | 'Medium' | 'Low';
-  suggestion?: string;
+interface ATSReportProps {
+  profile: Profile;
+  score: number;
+  matchingKeywords: string[];
+  missingKeywords: string[];
+  jobTitle?: string;
+  companyName?: string;
+  className?: string;
 }
 
-export interface ATSReportProps {
-  name: string;
-  jobTitle: string;
-  company?: string;
-  matchScore: number;
-  summary: string;
-  keywordMatches: KeywordMatch[];
-  missingKeywords: Array<{
-    keyword: string;
-    suggestion: string;
-  }>;
-  skillsAssessment: {
-    technical: string;
-    soft: string;
-    domain: string;
-  };
-  formatAssessment: {
-    score: number;
-    feedback: string;
-  };
-  contentSuggestions: string[];
-  recommendations: string[];
-  theme?: 'default' | 'professional' | 'modern' | 'minimal';
-}
-
-export const defaultATSReportStyles = `
-  .ats-report-container {
-    font-family: 'Arial', sans-serif;
-    color: #333;
-    line-height: 1.5;
-    max-width: 8.5in;
-    margin: 0 auto;
-    padding: 0.5in;
-  }
-  .ats-report-header {
-    text-align: center;
-    margin-bottom: 30px;
-  }
-  .ats-report-title {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 5px;
-  }
-  .ats-report-subtitle {
-    font-size: 16px;
-    color: #666;
-  }
-  .ats-report-section {
-    margin-bottom: 25px;
-  }
-  .ats-report-section-title {
-    font-size: 18px;
-    font-weight: bold;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 15px;
-    padding-bottom: 5px;
-  }
-  .ats-report-match-score {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-  }
-  .ats-report-score-circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: conic-gradient(#4caf50 0% calc(var(--score) * 1%), #f0f0f0 calc(var(--score) * 1%) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 20px;
-    position: relative;
-  }
-  .ats-report-score-circle::before {
-    content: '';
-    position: absolute;
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    background-color: white;
-  }
-  .ats-report-score-text {
-    position: relative;
-    font-size: 20px;
-    font-weight: bold;
-    z-index: 1;
-  }
-  .ats-report-summary {
-    flex: 1;
-  }
-  .ats-report-keywords-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-  }
-  .ats-report-keywords-table th,
-  .ats-report-keywords-table td {
-    border: 1px solid #ddd;
-    padding: 8px 12px;
-    text-align: left;
-  }
-  .ats-report-keywords-table th {
-    background-color: #f0f0f0;
-  }
-  .ats-report-keywords-table tr:nth-child(even) {
-    background-color: #f9f9f9;
-  }
-  .ats-report-present {
-    color: #4caf50;
-  }
-  .ats-report-missing {
-    color: #f44336;
-  }
-  .ats-report-importance-high {
-    color: #f44336;
-    font-weight: bold;
-  }
-  .ats-report-importance-medium {
-    color: #ff9800;
-  }
-  .ats-report-importance-low {
-    color: #2196f3;
-  }
-  .ats-report-missing-keywords {
-    margin-bottom: 20px;
-  }
-  .ats-report-missing-keyword {
-    margin-bottom: 10px;
-  }
-  .ats-report-missing-keyword-name {
-    font-weight: bold;
-  }
-  .ats-report-skills-assessment {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin-bottom: 20px;
-  }
-  .ats-report-skills-card {
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    padding: 15px;
-  }
-  .ats-report-skills-card-title {
-    font-weight: bold;
-    margin-bottom: 10px;
-    color: #333;
-  }
-  .ats-report-format-assessment {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-  }
-  .ats-report-format-score {
-    display: flex;
-    align-items: center;
-    margin-right: 20px;
-  }
-  .ats-report-format-score-dots {
-    display: flex;
-    margin-left: 10px;
-  }
-  .ats-report-format-score-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 5px;
-  }
-  .ats-report-format-score-dot-filled {
-    background-color: #4caf50;
-  }
-  .ats-report-format-score-dot-empty {
-    background-color: #f0f0f0;
-  }
-  .ats-report-content-suggestions {
-    margin-bottom: 20px;
-  }
-  .ats-report-recommendations {
-    background-color: #f0f7ff;
-    border-left: 4px solid #2196f3;
-    padding: 15px;
-    margin-bottom: 20px;
-  }
-  .ats-report-recommendation {
-    margin-bottom: 10px;
-  }
-  
-  /* Professional theme */
-  .theme-professional {
-    font-family: 'Georgia', serif;
-  }
-  .theme-professional .ats-report-section-title {
-    color: #2c3e50;
-    border-bottom: 2px solid #2c3e50;
-  }
-  
-  /* Modern theme */
-  .theme-modern {
-    font-family: 'Helvetica', sans-serif;
-  }
-  .theme-modern .ats-report-section-title {
-    color: #3498db;
-    border-bottom: none;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  
-  /* Minimal theme */
-  .theme-minimal {
-    font-family: 'Calibri', sans-serif;
-  }
-  .theme-minimal .ats-report-section-title {
-    border-bottom: none;
-    font-size: 16px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
-`;
-
-export const ATSReport: React.FC<ATSReportProps> = ({
-  name,
-  jobTitle,
-  company,
-  matchScore,
-  summary,
-  keywordMatches,
+export default function ATSReport({
+  profile,
+  score,
+  matchingKeywords,
   missingKeywords,
-  skillsAssessment,
-  formatAssessment,
-  contentSuggestions,
-  recommendations,
-  theme = 'default'
-}) => {
-  const themeClass = theme !== 'default' ? `theme-${theme}` : '';
-  
+  jobTitle = 'the position',
+  companyName = 'the company',
+  className = ''
+}: ATSReportProps) {
+  // Get the score color
+  const getScoreColor = () => {
+    if (score >= 80) return '#10b981'; // emerald-500
+    if (score >= 60) return '#f59e0b'; // amber-500
+    return '#ef4444'; // red-500
+  };
+
   return (
-    <div className={`ats-report-container ${themeClass}`}>
-      <style dangerouslySetInnerHTML={{ __html: defaultATSReportStyles }} />
-      
-      <header className="ats-report-header">
-        <h1 className="ats-report-title">ATS Optimization Report</h1>
-        <div className="ats-report-subtitle">
-          {name} | {jobTitle}{company ? ` at ${company}` : ''}
-        </div>
+    <div className={`ats-report-container ${className}`}>
+      <header>
+        <h1>ATS Match Report</h1>
+        <h2>{profile.name}</h2>
+        {jobTitle && companyName && (
+          <p className="job-info">
+            {jobTitle} at {companyName}
+          </p>
+        )}
       </header>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Executive Summary</h2>
-        <div className="ats-report-match-score">
+
+      <div className="score-section">
+        <h2>Match Score: {score}%</h2>
+        <div className="score-bar-container">
           <div 
-            className="ats-report-score-circle" 
-            style={{ '--score': matchScore } as React.CSSProperties}
-          >
-            <span className="ats-report-score-text">{matchScore}%</span>
-          </div>
-          <div className="ats-report-summary">
-            <p>{summary}</p>
-          </div>
+            className="score-bar-fill"
+            style={{ 
+              width: `${score}%`,
+              backgroundColor: getScoreColor()
+            }}
+          ></div>
         </div>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Keyword Analysis</h2>
-        <table className="ats-report-keywords-table">
-          <thead>
-            <tr>
-              <th>Keyword</th>
-              <th>Present</th>
-              <th>Frequency</th>
-              <th>Importance</th>
-              <th>Suggestion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {keywordMatches.map((keyword, index) => (
-              <tr key={index}>
-                <td>{keyword.keyword}</td>
-                <td className={keyword.present ? "ats-report-present" : "ats-report-missing"}>
-                  {keyword.present ? "Yes" : "No"}
-                </td>
-                <td>{keyword.frequency || 0}</td>
-                <td className={`ats-report-importance-${keyword.importance.toLowerCase()}`}>
-                  {keyword.importance}
-                </td>
-                <td>{keyword.suggestion || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Missing Critical Keywords</h2>
-        <div className="ats-report-missing-keywords">
-          {missingKeywords.map((keyword, index) => (
-            <div key={index} className="ats-report-missing-keyword">
-              <div className="ats-report-missing-keyword-name">{keyword.keyword}</div>
-              <div>{keyword.suggestion}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Skills Assessment</h2>
-        <div className="ats-report-skills-assessment">
-          <div className="ats-report-skills-card">
-            <div className="ats-report-skills-card-title">Technical Skills</div>
-            <div>{skillsAssessment.technical}</div>
-          </div>
-          <div className="ats-report-skills-card">
-            <div className="ats-report-skills-card-title">Soft Skills</div>
-            <div>{skillsAssessment.soft}</div>
-          </div>
-          <div className="ats-report-skills-card">
-            <div className="ats-report-skills-card-title">Domain Knowledge</div>
-            <div>{skillsAssessment.domain}</div>
-          </div>
-        </div>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Resume Format & Structure</h2>
-        <div className="ats-report-format-assessment">
-          <div className="ats-report-format-score">
-            <div>ATS-friendliness score:</div>
-            <div className="ats-report-format-score-dots">
-              {[...Array(10)].map((_, i) => (
-                <div 
-                  key={i} 
-                  className={`ats-report-format-score-dot ${i < formatAssessment.score ? 'ats-report-format-score-dot-filled' : 'ats-report-format-score-dot-empty'}`}
-                ></div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <p>{formatAssessment.feedback}</p>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Content Optimization</h2>
-        <div className="ats-report-content-suggestions">
-          <ul>
-            {contentSuggestions.map((suggestion, index) => (
-              <li key={index}>{suggestion}</li>
+        <p className="score-description">
+          {score >= 80 ? (
+            'Excellent match! Your resume is well-aligned with this job description.'
+          ) : score >= 60 ? (
+            'Good match. With some adjustments, your resume could be even more competitive.'
+          ) : (
+            'Your resume needs significant tailoring to better match this job description.'
+          )}
+        </p>
+      </div>
+
+      <div className="keywords-section">
+        <div className="matching-keywords">
+          <h2>Keywords Found in Your Resume</h2>
+          <p>These keywords from the job description were found in your resume:</p>
+          <ul className="keyword-list">
+            {matchingKeywords.map((keyword, index) => (
+              <li key={index} className="keyword-item matching">{keyword}</li>
             ))}
           </ul>
         </div>
-      </section>
-      
-      <section className="ats-report-section">
-        <h2 className="ats-report-section-title">Final Recommendations</h2>
-        <div className="ats-report-recommendations">
-          <ol>
-            {recommendations.map((recommendation, index) => (
-              <li key={index} className="ats-report-recommendation">{recommendation}</li>
+
+        <div className="missing-keywords">
+          <h2>Missing Important Keywords</h2>
+          <p>Consider adding these keywords to your resume if they apply to your experience:</p>
+          <ul className="keyword-list">
+            {missingKeywords.map((keyword, index) => (
+              <li key={index} className="keyword-item missing">{keyword}</li>
             ))}
-          </ol>
+          </ul>
         </div>
-      </section>
+      </div>
+
+      <div className="recommendations">
+        <h2>Improvement Suggestions</h2>
+        <ul>
+          <li>Tailor your resume to include more keywords from the job description</li>
+          <li>Use industry-standard terminology that ATS systems can recognize</li>
+          <li>Ensure your skills section includes relevant technical skills mentioned in the job</li>
+          <li>Quantify your achievements with metrics where possible</li>
+          <li>Use action verbs at the beginning of bullet points</li>
+          <li>Focus on results and impact in your experience descriptions</li>
+        </ul>
+      </div>
+
+      <style jsx>{`
+        .ats-report-container {
+          font-family: 'Arial', sans-serif;
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 40px;
+          line-height: 1.5;
+        }
+        
+        header {
+          margin-bottom: 30px;
+          text-align: center;
+        }
+        
+        h1 {
+          font-size: 24px;
+          margin: 0 0 10px;
+          color: #2563eb;
+        }
+        
+        h2 {
+          font-size: 18px;
+          margin: 0 0 15px;
+        }
+        
+        .job-info {
+          font-style: italic;
+          color: #555;
+        }
+        
+        .score-section {
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 20px;
+          margin-bottom: 30px;
+          text-align: center;
+        }
+        
+        .score-bar-container {
+          height: 20px;
+          background-color: #e5e7eb;
+          border-radius: 10px;
+          overflow: hidden;
+          margin: 15px 0;
+        }
+        
+        .score-bar-fill {
+          height: 100%;
+          transition: width 1s ease-in-out;
+        }
+        
+        .score-description {
+          font-weight: 500;
+        }
+        
+        .keywords-section {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        
+        .matching-keywords, .missing-keywords {
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 20px;
+        }
+        
+        .keyword-list {
+          list-style: none;
+          padding: 0;
+          margin: 15px 0 0;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        
+        .keyword-item {
+          padding: 5px 10px;
+          border-radius: 15px;
+          font-size: 14px;
+        }
+        
+        .matching {
+          background-color: #d1fae5;
+          color: #065f46;
+        }
+        
+        .missing {
+          background-color: #fee2e2;
+          color: #991b1b;
+        }
+        
+        .recommendations {
+          background-color: #eff6ff;
+          border: 1px solid #dbeafe;
+          border-radius: 8px;
+          padding: 20px;
+        }
+        
+        .recommendations ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+        
+        .recommendations li {
+          margin-bottom: 8px;
+        }
+        
+        @media (max-width: 768px) {
+          .keywords-section {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </div>
   );
-};
-
-export default ATSReport;
+}

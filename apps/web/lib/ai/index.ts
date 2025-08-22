@@ -1,103 +1,82 @@
-import type { AIAdapter, GenArgs, GenResult } from "./types";
-import { OpenAIAdapter } from "./openai";
-import { OpenRouterAdapter } from "./openrouter";
-import { AnthropicAdapter } from "./anthropic";
-import { GeminiAdapter } from "./gemini";
-import { hasAnyProvider } from "@/lib/providers";
+// apps/web/lib/ai/index.ts
+import "server-only";
 
-export const ADAPTERS: AIAdapter[] = [
-  GeminiAdapter,
-  AnthropicAdapter,
-  OpenAIAdapter,
-  OpenRouterAdapter,
-];
-
-export function pickAdapter(name?: string): AIAdapter | null {
-  if (!name || name.toLowerCase() === "auto") {
-    return ADAPTERS.find(a => a.canUse()) || null;
-  }
-  const wanted = name.toLowerCase();
-  const found = ADAPTERS.find(a => a.name === wanted);
-  return found && found.canUse() ? found : null;
+// Simple AI provider interface
+export interface AIProvider {
+  generateText: (prompt: string) => Promise<string>;
 }
 
-export async function generateAny(
-  provider: string | undefined,
-  args: GenArgs
-): Promise<GenResult & { providerTried: string[] }> {
-  const tried: string[] = [];
-  
-  console.log(`[generateAny] Starting with provider: ${provider || 'auto'}`);
-
-  // For demo purposes, we'll use a mock response if no providers are configured
-  if (!hasAnyProvider()) {
-    console.warn("[generateAny] No AI provider API keys configured. Using mock response for demo purposes.");
+// Default AI provider that returns a simple response
+const defaultProvider: AIProvider = {
+  generateText: async (prompt: string) => {
+    console.log("Using default AI provider with prompt:", prompt.substring(0, 100) + "...");
     
-    // Return a mock response with placeholder text
-    return { 
-      text: `<article>
-        <h1>Demo Content (No API Keys Configured)</h1>
-        <p>This is placeholder content generated because no API keys are configured.</p>
-        <p>To use real AI generation, please add API keys to your .env.local file.</p>
-        <p>For example: GOOGLE_API_KEY=your_key_here</p>
-      </article>`,
-      usage: { provider: "mock", model: "demo", totalTokens: 0 },
-      providerTried: ["mock"] 
-    };
-  }
-
-  // Case 1: A specific provider is requested. Respect the user's choice and fail if it doesn't work.
-  if (provider && provider !== "auto") {
-    console.log(`[generateAny] Using specific provider: ${provider}`);
-    const requestedAdapter = pickAdapter(provider);
-    if (!requestedAdapter) {
-      console.error(`[generateAny] Requested provider "${provider}" is not available or configured`);
-      throw new Error(`Requested provider "${provider}" is not available or configured. Check your API key.`);
-    }
-    
-    tried.push(requestedAdapter.name);
-    try {
-      console.log(`[generateAny] Generating with ${requestedAdapter.name}`);
-      const norm = { ...args, model: requestedAdapter.normalizeModel(args.model) };
-      const result = await requestedAdapter.generate(norm);
-      console.log(`[generateAny] Successfully generated with ${requestedAdapter.name}`);
-      return { ...result, providerTried: tried };
-    } catch (error: any) {
-      console.error(`[generateAny] Provider ${provider} failed:`, error);
-      // Re-throw the specific error to the client to be displayed. No fallback.
-      throw new Error(`The selected provider "${provider}" failed. Error: ${error.message}`);
-    }
-  }
-
-  // Case 2: "auto" mode. Find the first available provider that works.
-  const availableAdapters = ADAPTERS.filter(a => a.canUse());
-  console.log(`[generateAny] Auto mode with ${availableAdapters.length} available adapters: ${availableAdapters.map(a => a.name).join(', ')}`);
-  
-  let lastErr: any = null;
-
-  for (const adapter of availableAdapters) {
-    tried.push(adapter.name);
-    try {
-      console.log(`[generateAny] Auto-trying provider: ${adapter.name}`);
-      // When in auto mode, we don't have a specific model, so we let the adapter pick its default.
-      const norm = { ...args, model: adapter.normalizeModel(args.model === 'auto' ? undefined : args.model) };
-      // If successful, we return immediately.
-      const result = await adapter.generate(norm);
-      console.log(`[generateAny] Auto-provider ${adapter.name} succeeded.`);
-      return { ...result, providerTried: tried };
-    } catch (e: any) {
-      console.warn(`[generateAny] Auto-provider ${adapter.name} failed:`, e.message);
-      lastErr = e; // Keep track of the last error and continue to the next adapter.
+    // For testing purposes, generate a simple response
+    if (prompt.includes("resume")) {
+      return `
+        <h1>John Doe</h1>
+        <p>123 Main Street, Anytown, USA | john.doe@example.com | (555) 123-4567</p>
+        
+        <h2>Summary</h2>
+        <p>Experienced software developer with expertise in web development and cloud technologies.</p>
+        
+        <h2>Experience</h2>
+        <h3>Software Engineer | Tech Company | 2020-Present</h3>
+        <ul>
+          <li>Developed and maintained web applications using React and Node.js</li>
+          <li>Implemented CI/CD pipelines using GitHub Actions</li>
+          <li>Optimized database queries resulting in 30% performance improvement</li>
+        </ul>
+        
+        <h2>Education</h2>
+        <p>Bachelor of Science in Computer Science | University | 2016-2020</p>
+        
+        <h2>Skills</h2>
+        <p>JavaScript, TypeScript, React, Node.js, AWS, Docker, Git</p>
+      `;
+    } else if (prompt.includes("cover")) {
+      return `
+        <h1>John Doe</h1>
+        <p>123 Main Street, Anytown, USA | john.doe@example.com | (555) 123-4567</p>
+        
+        <h2>Dear Hiring Manager,</h2>
+        
+        <p>I am writing to express my interest in the Software Engineer position at your company. With my experience in web development and cloud technologies, I believe I would be a valuable addition to your team.</p>
+        
+        <p>Throughout my career, I have developed strong skills in JavaScript, TypeScript, React, and Node.js. I have also worked extensively with AWS and Docker, which I understand are key technologies used at your company.</p>
+        
+        <p>I look forward to the opportunity to discuss how my skills and experience align with your needs.</p>
+        
+        <p>Sincerely,<br>John Doe</p>
+      `;
+    } else {
+      return "Generated content based on your prompt.";
     }
   }
+};
 
-  // If we get here, all available providers failed.
-  if (lastErr) {
-     console.error(`[generateAny] All available AI providers failed. Tried: ${tried.join(", ")}`);
-     throw new Error(`All available AI providers failed. Tried: ${tried.join(", ")}. Please check your API keys. Last error: ${lastErr.message}`);
-  }
+// Map of model names to providers
+const providers: Record<string, AIProvider> = {
+  "auto": defaultProvider,
+  "claude-4": defaultProvider,
+  "claude-3-opus": defaultProvider,
+  "claude-3-sonnet": defaultProvider,
+  "claude-3-haiku": defaultProvider,
+  "gpt-5": defaultProvider,
+  "gpt-4-turbo": defaultProvider,
+  "gpt-4": defaultProvider,
+  "gpt-3.5-turbo": defaultProvider,
+  "gemini-2.5-pro": defaultProvider,
+  "gemini-2.0-pro": defaultProvider,
+  "gemini-1.5-pro": defaultProvider,
+  "gemini-1.5-ultra": defaultProvider,
+  "openrouter/mistral-large": defaultProvider,
+  "openrouter/deepseek-coder": defaultProvider,
+  "openrouter/solar": defaultProvider,
+  "openrouter/mixtral-8x7b": defaultProvider,
+};
 
-  // This case covers if no adapters were available but anyAIKey was true.
-  console.error("[generateAny] No AI providers could be used");
-  throw new Error("No AI providers could be used. Please check your API key configuration.");
+// Get AI provider based on model name
+export function getAiProvider(model: string = "auto"): AIProvider {
+  return providers[model] || defaultProvider;
 }

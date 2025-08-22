@@ -1,31 +1,33 @@
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import path from 'path';
+import fs from 'fs';
 
-export function getPublicDir() {
-  // Works whether CWD is repo root or apps/web
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  // apps/web/lib/server -> up to apps/web
-  const appRoot = path.resolve(here, "../../..");
-  const publicDir = path.join(appRoot, "public");
-  return publicDir;
+// Get the absolute path to the downloads directory
+export function getDownloadsDir() {
+  const downloadsDir = path.join(process.cwd(), 'public', 'downloads');
+  
+  // Ensure the downloads directory exists
+  if (!fs.existsSync(downloadsDir)) {
+    fs.mkdirSync(downloadsDir, { recursive: true });
+  }
+  
+  return downloadsDir;
 }
 
-export function ensureDownloadsDir(traceId: string) {
-  const publicDir = getPublicDir();
-  const downloadsBase = path.join(publicDir, "downloads");
-  const traceDir = path.join(downloadsBase, traceId);
+// Join paths safely for the downloads directory
+export function joinDownload(...paths: string[]) {
+  return path.join(getDownloadsDir(), ...paths);
+}
 
-  // Create directories if they don't exist
-  [downloadsBase, traceDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
-    }
-  });
+// Get the public URL for a download file
+export function getDownloadUrl(traceId: string, filename: string) {
+  return `/downloads/${traceId}/${filename}`;
+}
 
+// Create a trace directory for storing files
+export function createTraceDir(traceId: string) {
+  const traceDir = joinDownload(traceId);
+  if (!fs.existsSync(traceDir)) {
+    fs.mkdirSync(traceDir, { recursive: true });
+  }
   return traceDir;
-}
-
-export function downloadsDir(traceId: string) {
-  return ensureDownloadsDir(traceId);
 }

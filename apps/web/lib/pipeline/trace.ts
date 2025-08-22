@@ -1,25 +1,52 @@
-import fs from "fs";
-import path from "path";
+type LogLevel = "info" | "warn" | "error";
 
-export function createTraceId() {
-  return Math.random().toString(36).slice(2, 10);
+interface TraceEntry {
+  timestamp: string;
+  component: string;
+  level: LogLevel;
+  message: string;
+  data?: any;
 }
 
-export function ensureDebugDir() {
-  const dir = path.join(process.cwd(), "debug");
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
+const traces = new Map<string, TraceEntry[]>();
+
+export function trace(
+  component: string,
+  level: LogLevel,
+  message: string,
+  data?: any
+) {
+  console.log(`[${component}] ${level.toUpperCase()}: ${message}`, data || "");
 }
 
-export function logDebug(traceId: string, component: string, level: "info"|"warn"|"error", message: string, data?: any) {
-  try {
-    const dir = ensureDebugDir();
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      traceId, component, level, message, data
-    }) + "\n";
-    fs.appendFileSync(path.join(dir, `${traceId}.log`), line);
-    // also mirror last errors in memory (very small ring buffer)
-    // (lightweight: rely on existing /api/debug/last-errors if present)
-  } catch {}
+export function addTrace(
+  traceId: string,
+  component: string,
+  level: LogLevel,
+  message: string,
+  data?: any
+) {
+  const entry: TraceEntry = {
+    timestamp: new Date().toISOString(),
+    component,
+    level,
+    message,
+    data
+  };
+
+  if (!traces.has(traceId)) {
+    traces.set(traceId, []);
+  }
+  traces.get(traceId)?.push(entry);
+
+  // Also log to console
+  trace(component, level, message, data);
+}
+
+export function getTraces(traceId: string): TraceEntry[] {
+  return traces.get(traceId) || [];
+}
+
+export function clearTraces(traceId: string) {
+  traces.delete(traceId);
 }

@@ -1,29 +1,33 @@
 :root {
-  /* legacy theme (default) */
+  /* Green/Purple theme (default) */
   --bg: #0f172a;          /* dark slate */
   --panel: #111827;       /* near-black panel */
   --muted: #1f2937;       /* muted border */
   --text: #e5e7eb;        /* light text */
   --subtle: #9ca3af;      /* secondary text */
-  --brand: #6366f1;       /* legacy brand indigo */
-  --accent: #3b82f6;      /* buttons/links */
+  --brand: #10b981;       /* emerald-500 primary */
+  --brand-dark: #059669;  /* emerald-600 primary hover */
+  --accent: #8b5cf6;      /* purple-500 secondary */
+  --accent-dark: #7c3aed; /* purple-600 secondary hover */
   --card-radius: 16px;
   --shadow: 0 10px 30px rgba(0,0,0,.25);
   --spacing-compact: 0.5rem;
   --spacing-normal: 1rem;
 }
 
-/* optional modern theme retained */
-:root[data-theme="modern"]{
-  --bg:#0b1220; 
-  --panel:#0f172a; 
-  --muted:#1e293b; 
-  --text:#e2e8f0; 
-  --subtle:#94a3b8;
-  --brand:#7c3aed; 
-  --accent:#06b6d4; 
-  --card-radius:20px; 
-  --shadow:0 12px 36px rgba(0,0,0,.3);
+/* Dark mode theme */
+.dark {
+  --bg: #0b1220; 
+  --panel: #0f172a; 
+  --muted: #1e293b; 
+  --text: #e2e8f0; 
+  --subtle: #94a3b8;
+  --brand: #10b981;       /* emerald-500 primary */
+  --brand-dark: #059669;  /* emerald-600 primary hover */
+  --accent: #8b5cf6;      /* purple-500 secondary */
+  --accent-dark: #7c3aed; /* purple-600 secondary hover */
+  --card-radius: 16px;
+  --shadow: 0 12px 36px rgba(0,0,0,.3);
   --spacing-compact: 0.75rem;
   --spacing-normal: 1.5rem;
 }
@@ -61,14 +65,14 @@ a, .link {
 }
 
 .button-primary:hover {
-  opacity: 0.9;
+  background: var(--brand-dark);
   transform: translateY(-1px);
 }
 
 .button-secondary {
   background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--muted);
+  color: var(--accent);
+  border: 1px solid var(--accent);
   border-radius: 12px;
   padding: var(--spacing-compact) var(--spacing-normal);
   cursor: pointer;
@@ -77,7 +81,8 @@ a, .link {
 }
 
 .button-secondary:hover {
-  background: var(--muted);
+  background: rgba(139, 92, 246, 0.1); /* purple-500 with opacity */
+  border-color: var(--accent-dark);
 }
 
 .navbar {
@@ -100,6 +105,6 @@ a, .link {
 }
 
 .navbar-link.active {
-  color: var(--accent);
-  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand);
+  background: rgba(16, 185, 129, 0.1); /* emerald-500 with opacity */
 }

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { renderToStaticMarkup } from 'react-dom/server';
+import "server-only";
+import { renderReactToHtml } from './serverRenderer';
 import puppeteer from 'puppeteer-core';
 import chrome from 'chrome-aws-lambda';
 import { createLogger } from '@/lib/logger';
@@ -75,7 +76,7 @@ export async function generatePdfFromReact<T extends React.ElementType>(
     // Render the component to static HTML
     let html: string;
     try {
-      html = renderToStaticMarkup(<Component {...props} />);
+      html = await renderReactToHtml(<Component {...props} />);
     } catch (renderError: any) {
       throw new PDFGenerationError('Failed to render React component to HTML', {
         code: 'REACT_RENDER_ERROR',

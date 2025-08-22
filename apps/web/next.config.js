@@ -9,6 +9,16 @@ const nextConfig = {
   env: {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   },
+  webpack: (config, { isServer }) => {
+    // Fix for chrome-aws-lambda source map issues
+    config.module.rules.push({
+      test: /\.map$/,
+      use: 'ignore-loader',
+      include: /node_modules/,
+    });
+    
+    return config;
+  },
 };
 module.exports = withPWA(nextConfig);
 

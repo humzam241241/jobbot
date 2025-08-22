@@ -19,6 +19,7 @@ interface Downloads {
   resumeDocx: string;
   coverPdf: string;
   coverDocx: string;
+  atsReport: string;
 }
 
 export default function ResumeTailor() {
@@ -70,25 +71,29 @@ export default function ResumeTailor() {
       setStep('uploading');
       setError(null);
       
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('jobDescription', jobDescription);
+      // Import at runtime to avoid bundling server code
+      const { generateResumeKit } = await import("@/lib/client/resumeKit");
+      const result = await generateResumeKit({ 
+        file, 
+        jd: jobDescription 
+      });
+      setTraceId(result.traceId);
       
-      // Start the tailoring process
-      const response = await fetch('/api/tailorResume', {
-        method: 'POST',
-        body: formData
+      // Set download URLs
+      setDownloads({
+        resumePdf: result.files.resumePdf.publicUrl,
+        resumeDocx: result.files.resumeDocx.apiUrl,
+        coverPdf: result.files.coverPdf.publicUrl,
+        coverDocx: result.files.coverDocx.apiUrl,
+        atsReport: result.files.atsReport.publicUrl
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Resume tailoring failed');
-      }
-      
-      const result = await response.json();
-      setTraceId(result.traceId);
-      setDownloads(result.downloads);
       setStep('done');
+      
+      // Open PDFs in new tabs
+      window.open(result.files.resumePdf.publicUrl, '_blank');
+      window.open(result.files.coverPdf.publicUrl, '_blank');
+      window.open(result.files.atsReport.publicUrl, '_blank');
       
       // Fetch debug logs
       if (result.traceId) {
@@ -187,49 +192,65 @@ export default function ResumeTailor() {
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Your Documents Are Ready!</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border rounded-lg p-4">
-                <h4 className="font-medium mb-2">Tailored Resume</h4>
-                <div className="flex space-x-2">
-                  <a 
-                    href={downloads.resumePdf} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-                  >
-                    View PDF
-                  </a>
-                  <a 
-                    href={downloads.resumeDocx} 
-                    download 
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-                  >
-                    Download DOCX
-                  </a>
+                          <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Tailored Resume</h4>
+                    <div className="flex space-x-2">
+                      <a 
+                        href={downloads.resumePdf} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+                      >
+                        View PDF
+                      </a>
+                      <a 
+                        href={downloads.resumeDocx} 
+                        download 
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+                      >
+                        Download DOCX
+                      </a>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Cover Letter</h4>
+                    <div className="flex space-x-2">
+                      <a 
+                        href={downloads.coverPdf} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+                      >
+                        View PDF
+                      </a>
+                      <a 
+                        href={downloads.coverDocx} 
+                        download 
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
+                      >
+                        Download DOCX
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-medium mb-2">ATS Analysis Report</h4>
+                  <div className="flex justify-center">
+                    <a 
+                      href={downloads.atsReport} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-green-600 text-white py-2 px-8 rounded-lg text-center hover:bg-green-700"
+                    >
+                      View ATS Report
+                    </a>
+                  </div>
                 </div>
               </div>
-              
-              <div className="border rounded-lg p-4">
-                <h4 className="font-medium mb-2">Cover Letter</h4>
-                <div className="flex space-x-2">
-                  <a 
-                    href={downloads.coverPdf} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-                  >
-                    View PDF
-                  </a>
-                  <a 
-                    href={downloads.coverDocx} 
-                    download 
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-center hover:bg-blue-700"
-                  >
-                    Download DOCX
-                  </a>
-                </div>
-              </div>
-            </div>
           </div>
         )}
         

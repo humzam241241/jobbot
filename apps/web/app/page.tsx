@@ -9,10 +9,8 @@ export default function Home() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    // Always sign out when landing on the home page to ensure a fresh start
-    
-    // Reset token stats to exactly 30 generations
-    if (typeof window !== "undefined") {
+    // Reset token stats to exactly 30 generations if they don't exist
+    if (typeof window !== "undefined" && !localStorage.getItem("tokenStats")) {
       const TOKENS_PER_GENERATION = 10000;
       const MAX_GENERATIONS = 30;
       localStorage.setItem("tokenStats", JSON.stringify({
@@ -22,18 +20,9 @@ export default function Home() {
       }));
     }
     
+    // If authenticated, redirect to dashboard
     if (status === "authenticated" && session) {
-      // Clear all auth-related storage
-      localStorage.removeItem('generatedKit');
-      sessionStorage.clear();
-      
-      // Clear auth cookies
-      document.cookie = "next-auth.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "__Secure-next-auth.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "next-auth.csrf-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      
-      // Use NextAuth signOut with redirect
-      signOut({ callbackUrl: pathOf("login"), redirect: true });
+      window.location.href = pathOf("dashboard");
     }
   }, [status, session]);
 
@@ -44,9 +33,14 @@ export default function Home() {
         <p className="text-lg text-neutral-400">
           Your AI-powered copilot for creating ATS-optimized application materials.
         </p>
-        <Link href={pathOf("login")} className="mt-3 inline-block rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20">
-          Login
-        </Link>
+        <div className="flex gap-4 justify-center">
+          <Link href={pathOf("login")} className="mt-3 inline-block rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-3 text-sm font-medium text-white transition-colors">
+            Login
+          </Link>
+          <Link href={pathOf("signup")} className="mt-3 inline-block rounded-xl border border-purple-500 px-6 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/10 transition-colors">
+            Sign Up
+          </Link>
+        </div>
       </div>
     </main>
   )
