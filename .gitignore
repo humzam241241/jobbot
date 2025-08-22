@@ -7,4 +7,18 @@
 # Secrets
 *.pem
 *.key
-*.crt
+*.crtnode_modules/
+**/node_modules/
+.next/
+**/.next/
+debug/
+**/debug/
+*.log
+**/*.log
+apps/web/public/resumes/
+**/*.pdf
+**/*.docx
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/prisma/dev.db
+resume-bot/apps/.expo/
