@@ -1,52 +1,69 @@
 import OpenAI from "openai";
-import { forceJsonPrompt, extractFirstJsonObject, repairWithProvider } from "../utils/json";
-import { tailorResponseSchema, TailorResponseT } from "@/lib/schemas/resume";
-import { resolveModel } from "../resolveModel";
+import { logger } from '@/lib/logging/logger';
+import { modelFor } from './router';
+import { withRetries } from '../utils/retry';
 
-type Args = { apiKey: string; model?: string; prompt: string; schemaText: string };
+const SYSTEM_PROMPT = `Act as a senior technical recruiter at a fast-growing startup. Your task is to REWRITE the candidate's resume content to present them as a high-potential entry-level hire.
 
-export async function openaiTailorResume({ apiKey, model, prompt, schemaText }: Args): Promise<TailorResponseT> {
-  const openai = new OpenAI({ apiKey });
-  const finalModel = resolveModel("openai", model);
+MANDATORY FORMAT & LAYOUT RULES:
+- Keep the original resume layout, section order, headings, and overall structure exactly as provided by the user's input. Do not add new sections. Do not remove existing sections. Do not shuffle section order.
+- Preserve spacing, bullets vs. paragraphs, and approximate line lengths so the resume remains ATS-friendly and ≤1 page.
+- If the original resume is slightly "odd," keep its stylistic quirks but improve clarity and correctness.
+- Use plain Unicode characters only; avoid fancy symbols or non-ATS fonts.
 
-  const doCall = async (p: string) => {
-    try {
-      const r = await openai.chat.completions.create({
-        model: finalModel,
-        messages: [{ role: "user", content: p }],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 4000,
-      });
-      return r.choices[0]?.message?.content ?? "";
-    } catch (err: any) {
-      // Map OpenAI errors to our error types
-      if (err.status === 429 || /rate.*limit|quota/i.test(err.message)) {
-        const e: any = new Error('RATE_LIMIT');
-        e.code = 'RATE_LIMIT';
-        e.status = 429;
-        e.retryAfter = Number(err.headers?.['retry-after']) || 60;
-        throw e;
-      }
+CONTENT RULES:
+- Rewrite bullet points with high-impact action verbs, measurable outcomes, and correct industry terminology.
+- Convert personal/academic projects into business-value statements that show results, users served, cost/time saved, or quality improved.
+- Highlight transferable skills from non-tech experience when relevant (customer focus, ops rigor, communication, ownership, reliability).
+- Prioritize results, impact, and clarity over tasks and tool lists.
+- Respect the candidate's seniority: emphasize learning velocity, collaboration, and reliable delivery for entry-level roles.
+- Remove fluff, clichés, and filler; keep only the strongest evidence.
+- Keep tech stacks accurate and concise. Avoid tool bloat.
+- Maintain an inclusive and professional tone. No exaggerations or unverifiable claims.
 
-      if (err.status === 404 && /model.*not.*exist/i.test(err.message)) {
-        const e: any = new Error('MODEL_NOT_FOUND');
-        e.code = 'MODEL_NOT_FOUND';
-        e.hint = `Model "${model}" not found. Using "${finalModel}" for OpenAI.`;
-        throw e;
-      }
+OUTPUT RULES:
+- Return only the rewritten resume body text in the same section order and bullet structure as the original. Do not include analysis or explanations.
+- Keep it ATS-friendly (no tables, no text boxes, minimal special characters).
+- Keep it under one page if the source is longer; compress by merging redundant bullets and tightening phrasing.`;
 
-      throw err;
-    }
-  };
+export async function openaiTailorResume({ 
+  apiKey, 
+  model, 
+  resumeText, 
+  jobDescription 
+}: { 
+  apiKey: string; 
+  model?: string; 
+  resumeText: string; 
+  jobDescription: string; 
+}): Promise<string> {
+  const effectiveModel = modelFor('openai', model);
+  const client = new OpenAI({ apiKey });
 
-  const text = await doCall(forceJsonPrompt(prompt, schemaText));
-  let json = extractFirstJsonObject(text);
+  const userPrompt = [
+    'ORIGINAL RESUME (PRESERVE LAYOUT):',
+    '<<<RESUME_START',
+    resumeText,
+    'RESUME_END>>>',
+    '',
+    'TARGET JOB DESCRIPTION:',
+    '<<<JD_START',
+    jobDescription,
+    'JD_END>>>',
+  ].join('\n');
 
-  try { 
-    return tailorResponseSchema.parse(json); 
-  } catch (e) {
-    const fixed = await repairWithProvider<TailorResponseT>("openai", doCall, json, e as any);
-    return tailorResponseSchema.parse(fixed);
-  }
+  return withRetries(async () => {
+    logger.debug('Calling OpenAI with model:', effectiveModel);
+    const response = await client.chat.completions.create({
+      model: effectiveModel,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 4000,
+    });
+
+    return response.choices[0]?.message?.content ?? '';
+  });
 }

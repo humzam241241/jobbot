@@ -1,70 +1,78 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { forceJsonPrompt, extractFirstJsonObject, repairWithProvider } from "../utils/json";
-import { tailorResponseSchema, TailorResponseT } from "@/lib/schemas/resume";
-import { resolveModel } from "../resolveModel";
+import { logger } from '@/lib/logging/logger';
+import { modelFor } from './router';
 
-type Args = { apiKey: string; model?: string; prompt: string; schemaText: string };
+const SYSTEM_PROMPT = `Act as a senior technical recruiter at a fast-growing startup. Your task is to REWRITE the candidate's resume content to present them as a high-potential entry-level hire.
 
-export async function googleTailorResume({ apiKey, model, prompt, schemaText }: Args): Promise<TailorResponseT> {
-  const client = new GoogleGenerativeAI(apiKey);
-  const finalModel = resolveModel("google", model);
+MANDATORY FORMAT & LAYOUT RULES:
+- Keep the original resume layout, section order, headings, and overall structure exactly as provided by the user's input. Do not add new sections. Do not remove existing sections. Do not shuffle section order.
+- Preserve spacing, bullets vs. paragraphs, and approximate line lengths so the resume remains ATS-friendly and ≤1 page.
+- If the original resume is slightly "odd," keep its stylistic quirks but improve clarity and correctness.
+- Use plain Unicode characters only; avoid fancy symbols or non-ATS fonts.
 
-  const doCall = async (p: string) => {
-    try {
-      const r = await client.generateContent({
-        model: finalModel,
-        contents: [{ role: "user", parts: [{ text: p }]}],
-        generationConfig: {
-          temperature: 0.2,
-          candidateCount: 1,
-          stopSequences: ["}"],
-          maxOutputTokens: 4000,
-        }
-      });
+CONTENT RULES:
+- Rewrite bullet points with high-impact action verbs, measurable outcomes, and correct industry terminology.
+- Convert personal/academic projects into business-value statements that show results, users served, cost/time saved, or quality improved.
+- Highlight transferable skills from non-tech experience when relevant (customer focus, ops rigor, communication, ownership, reliability).
+- Prioritize results, impact, and clarity over tasks and tool lists.
+- Respect the candidate's seniority: emphasize learning velocity, collaboration, and reliable delivery for entry-level roles.
+- Remove fluff, clichés, and filler; keep only the strongest evidence.
+- Keep tech stacks accurate and concise. Avoid tool bloat.
+- Maintain an inclusive and professional tone. No exaggerations or unverifiable claims.
 
-      if (!r.response.ok) {
-        throw new Error(r.response.text());
+OUTPUT RULES:
+- Return only the rewritten resume body text in the same section order and bullet structure as the original. Do not include analysis or explanations.
+- Keep it ATS-friendly (no tables, no text boxes, minimal special characters).
+- Keep it under one page if the source is longer; compress by merging redundant bullets and tightening phrasing.`;
+
+export async function googleTailorResume({ 
+  apiKey, 
+  model, 
+  resumeText, 
+  jobDescription 
+}: { 
+  apiKey: string; 
+  model?: string; 
+  resumeText: string; 
+  jobDescription: string; 
+}): Promise<string> {
+  const effectiveModel = modelFor('google', model);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const m = genAI.getGenerativeModel({ model: effectiveModel });
+
+  const prompt = [
+    SYSTEM_PROMPT,
+    '',
+    'ORIGINAL RESUME (PRESERVE LAYOUT):',
+    '<<<RESUME_START',
+    resumeText,
+    'RESUME_END>>>',
+    '',
+    'TARGET JOB DESCRIPTION:',
+    '<<<JD_START',
+    jobDescription,
+    'JD_END>>>',
+  ].join('\n');
+
+  try {
+    logger.debug('Calling Google AI with model:', effectiveModel);
+    const result = await m.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 4000,
       }
+    });
 
-      return r.response.text();
-    } catch (err: any) {
-      // Map Google errors to our error types
-      const msg = String(err?.message || err);
-      
-      if (msg.includes('quota') || msg.includes('rate limit')) {
-        const e: any = new Error('RATE_LIMIT');
-        e.code = 'RATE_LIMIT';
-        e.status = 429;
-        throw e;
-      }
-
-      if (msg.includes('model not found') || msg.includes('does not exist')) {
-        const e: any = new Error('MODEL_NOT_FOUND');
-        e.code = 'MODEL_NOT_FOUND';
-        e.hint = `Model "${model}" not found. Using "${finalModel}" for Google.`;
-        throw e;
-      }
-
-      throw err;
+    if (!result.response.ok) {
+      throw new Error(result.response.text());
     }
-  };
 
-  // Add strong JSON hints to the prompt
-  const jsonPrompt = [
-    prompt,
-    "\nYou MUST return a valid JSON object with this exact structure:",
-    schemaText,
-    "\nReturn ONLY the JSON object. No markdown fences, no commentary.",
-    "\nEnsure all required fields are present and non-null.",
-  ].join("\n");
-
-  const text = await doCall(jsonPrompt);
-  let json = extractFirstJsonObject(text);
-
-  try { 
-    return tailorResponseSchema.parse(json); 
-  } catch (e) {
-    const fixed = await repairWithProvider<TailorResponseT>("google", doCall, json, e as any);
-    return tailorResponseSchema.parse(fixed);
+    return result.response.text();
+  } catch (err: any) {
+    logger.error('Google AI error:', err);
+    throw err;
   }
 }
