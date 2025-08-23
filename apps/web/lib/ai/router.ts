@@ -19,7 +19,7 @@ export type RouterResult = {
   providerUsed: ProviderChoice;
 };
 
-const withTimeout = <T>(p: Promise<T>, ms = 30000) => {
+const withTimeout = <T>(p: Promise<T>, ms = 60000) => {
   logger.info('Starting operation with timeout', { timeoutMs: ms });
   
   return new Promise<T>((resolve, reject) => {
@@ -121,7 +121,7 @@ export async function generateWithAuto(
         const anthropic = new Anthropic({ apiKey: key });
         const resp = await withTimeout(
           anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
+            model: "claude-3-5-haiku-20241022",
             max_tokens: 4000,
             system: "Return only JSON matching the requested schema.",
             messages: [{ role: "user", content: prompt }],

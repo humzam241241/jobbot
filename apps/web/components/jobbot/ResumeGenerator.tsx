@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { createLogger } from '@/lib/logger';
 
@@ -64,13 +65,14 @@ const AI_PROVIDERS = {
 } as const;
 
 export function ResumeGenerator() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [jobUrl, setJobUrl] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [status, setStatus] = useState<ProcessingStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
-  const [downloads, setDownloads] = useState<{ resumeUrl?: string; coverLetterUrl?: string }>({});
+  const [downloads, setDownloads] = useState<{ resumeUrl?: string; coverLetterUrl?: string; atsReportUrl?: string }>({});
   const [provider, setProvider] = useState<AIProvider>('auto');
   const [model, setModel] = useState<string>('default');
   const [atsScore, setAtsScore] = useState<ATSScore | null>(null);
@@ -164,27 +166,41 @@ export function ResumeGenerator() {
       }
 
       setStatus('formatting');
+      const results = data?.results || {};
+      const resumeUrl = results.resumePdfUrl as string | undefined;
+      const coverLetterUrl = results.coverLetterPdfUrl as string | undefined;
+      const atsReportUrl = results.atsReportPdfUrl as string | undefined;
+      const resumeDocxUrl = results.resumeDocxUrl as string | undefined;
+      const coverLetterDocxUrl = results.coverLetterDocxUrl as string | undefined;
+      const atsReportDocxUrl = results.atsReportDocxUrl as string | undefined;
+
       addDebugLog('info', 'Processing response', {
-        hasResumeUrl: Boolean(data.resumeUrl),
-        hasCoverLetterUrl: Boolean(data.coverLetterUrl),
-        hasAts: Boolean(data.ats)
+        hasResumeUrl: Boolean(resumeUrl),
+        hasCoverLetterUrl: Boolean(coverLetterUrl),
+        hasAtsReportUrl: Boolean(atsReportUrl)
       });
-      
+
       setStatus('done');
-      setDownloads({
-        resumeUrl: data.resumeUrl,
-        coverLetterUrl: data.coverLetterUrl
-      });
-      
+      setDownloads({ resumeUrl, coverLetterUrl, atsReportUrl });
+
       if (data.ats) {
         setAtsScore(data.ats);
       }
-      
+
       addDebugLog('info', 'Processing completed successfully', {
-        provider: data.providerUsed,
-        model: data.modelUsed,
+        provider: data.provider,
         atsScore: data.ats?.score
       });
+
+      // Redirect to summary page with links
+      const search = new URLSearchParams();
+      if (resumeUrl) search.set('resume', resumeUrl);
+      if (coverLetterUrl) search.set('cover', coverLetterUrl);
+      if (atsReportUrl) search.set('ats', atsReportUrl);
+      if (resumeDocxUrl) search.set('resumeDocx', resumeDocxUrl);
+      if (coverLetterDocxUrl) search.set('coverDocx', coverLetterDocxUrl);
+      if (atsReportDocxUrl) search.set('atsDocx', atsReportDocxUrl);
+      router.push(`/jobbot/result?${search.toString()}`);
     } catch (error: any) {
       setStatus('error');
       const errorMessage = error.message || 'An unexpected error occurred';
@@ -378,6 +394,15 @@ export function ResumeGenerator() {
                 className="block w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-center font-medium transition-colors"
               >
                 📥 Download Cover Letter
+              </a>
+            )}
+            {downloads.atsReportUrl && (
+              <a
+                href={downloads.atsReportUrl}
+                download
+                className="block w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-center font-medium transition-colors"
+              >
+                📥 Download ATS Report
               </a>
             )}
           </div>

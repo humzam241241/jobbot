@@ -5,6 +5,7 @@ import PDFDocument from "pdfkit";
 import MarkdownIt from "markdown-it";
 import { createLogger } from '@/lib/logger';
 import { prepareFonts } from './fonts';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 
 const logger = createLogger('pdf-generator');
 const md = new MarkdownIt();
@@ -36,6 +37,52 @@ function ensureOutDir() {
   }
 
   return out;
+}
+
+function writeMarkdownDocx(markdown: string, filename: string) {
+  const outDir = ensureOutDir();
+  const full = path.join(outDir, filename);
+  logger.info('Writing DOCX', { filename });
+
+  const html = md.render(markdown);
+  const stripped = html
+    .replace(/<[^>]+>/g, "")
+    .replace(/\&nbsp;/g, " ")
+    .trim();
+
+  const paragraphs: Paragraph[] = [];
+  const lines = stripped.split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      paragraphs.push(new Paragraph(""));
+      continue;
+    }
+    if (/^#{1,6}\s/.test(line)) {
+      const level = (line.match(/^(#{1,6})\s/)?.[1].length || 1) as 1|2|3|4|5|6;
+      const text = line.replace(/^#{1,6}\s/, '');
+      const headingLevel = level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2;
+      paragraphs.push(new Paragraph({ text, heading: headingLevel }));
+      continue;
+    }
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const content = line.replace(/^[-*]\s+/, '');
+      paragraphs.push(new Paragraph({ children: [ new TextRun({ text: `• ${content}` }) ] }));
+      continue;
+    }
+    paragraphs.push(new Paragraph({ children: [ new TextRun({ text: line }) ] }));
+  }
+
+  const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
+  const bufferPromise = Packer.toBuffer(doc);
+  const bufSyncWrite = (buf: Buffer) => {
+    fs.writeFileSync(full, buf);
+  };
+  return bufferPromise.then((buf) => {
+    bufSyncWrite(buf as Buffer);
+    logger.info('Successfully wrote DOCX', { path: full });
+    return { path: full, url: `/generated/${filename}` };
+  });
 }
 
 function writeMarkdownPdf(markdown: string, filename: string) {
@@ -183,11 +230,21 @@ export function generateResumeKitPdfs(args: {
       atsPath: ats.path
     });
 
-    return {
-      resumePdfUrl: resume.url,
-      coverLetterPdfUrl: cover.url,
-      atsReportPdfUrl: ats.url
-    };
+    // Generate DOCX files alongside PDFs
+    const resumeDocxPromise = writeMarkdownDocx(args.resume_markdown, `resume-${id}.docx`);
+    const coverDocxPromise = writeMarkdownDocx(args.cover_letter_markdown, `cover-letter-${id}.docx`);
+    const atsDocxPromise = writeMarkdownDocx(atsLines.join("\n"), `ats-report-${id}.docx`);
+
+    return Promise.all([resumeDocxPromise, coverDocxPromise, atsDocxPromise]).then(([resumeDocx, coverDocx, atsDocx]) => {
+      return {
+        resumePdfUrl: resume.url,
+        coverLetterPdfUrl: cover.url,
+        atsReportPdfUrl: ats.url,
+        resumeDocxUrl: resumeDocx.url,
+        coverLetterDocxUrl: coverDocx.url,
+        atsReportDocxUrl: atsDocx.url
+      };
+    });
   } catch (error) {
     logger.error('Error generating PDFs', { error });
     throw error;

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('google-provider');
@@ -33,44 +33,16 @@ export class GoogleProvider {
     logger.info('Generating with Google', { modelId: this.modelId });
 
     try {
-      // Use responses.generate (v1beta), which supports responseSchema
-      const result = await this.client.responses.generate({
-        model: this.modelId,
-        input: [{ role: "user", parts: [{ text: prompt }] }],
-        // generationConfig instead of generation_config
+      // Use GenerativeModel API with JSON response mime type
+      const model = this.client.getGenerativeModel({ model: this.modelId });
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 32768,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-              resume_markdown: { type: SchemaType.STRING },
-              cover_letter_markdown: { type: SchemaType.STRING },
-              ats_report: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  score: { type: SchemaType.NUMBER },
-                  matched_keywords: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  },
-                  missing_keywords: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  },
-                  notes: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  }
-                },
-                required: ["score", "matched_keywords", "missing_keywords"]
-              }
-            },
-            required: ["resume_markdown", "cover_letter_markdown", "ats_report"]
-          }
+          responseMimeType: "application/json"
         }
       });
 

@@ -13,7 +13,7 @@ This guide will help you test the enhanced Resume Kit Generator with improved er
 
 ## Test Scenarios
 
-### 1. Happy Path - Normal PDF Resume
+### 1. Happy Path - Normal PDF Resum
 
 **Steps:**
 1. Upload a standard text-based PDF resume

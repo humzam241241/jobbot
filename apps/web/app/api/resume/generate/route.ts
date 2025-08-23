@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Generate PDFs
-    const kit = generateResumeKitPdfs(result);
+    const kit = await generateResumeKitPdfs(result as any);
 
     logger.info('Resume kit generated', kit);
 
@@ -100,9 +100,7 @@ export async function POST(req: NextRequest) {
       {
         ok: true,
         provider: result.providerUsed,
-        results: {
-          ...kit
-        }
+        results: kit
       },
       { status: 200 }
     );
