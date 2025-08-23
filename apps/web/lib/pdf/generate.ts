@@ -1,110 +1,222 @@
 import PDFDocument from 'pdfkit';
 import { createLogger } from '@/lib/logger';
-import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 const logger = createLogger('pdf-generator');
 
 interface PdfGenerateOptions {
   content: string;
   title?: string;
-  originalContent?: string; // Original content to help preserve formatting
+  maxPages?: number;
   fontSize?: number;
   fontFamily?: string;
+  outputDir?: string;
+}
+
+interface ResumeContent {
+  summary?: string;
+  experience?: Array<{
+    company?: string;
+    role?: string;
+    bullets?: string[];
+  }>;
+  projects?: Array<{
+    name?: string;
+    bullets?: string[];
+  }>;
+  skills?: string[];
+  education?: Array<{
+    school?: string;
+    degree?: string;
+    year?: string;
+  }>;
 }
 
 /**
- * Generates a PDF from content with improved formatting
+ * Generates a PDF from content with strict page limit
  */
-export async function generatePdf(options: PdfGenerateOptions): Promise<Buffer> {
+export async function generatePdf(options: PdfGenerateOptions): Promise<{ buffer: Buffer; filePath: string }> {
   const {
     content,
     title = 'Generated Document',
-    originalContent,
+    maxPages = 1,
     fontSize = 11,
-    fontFamily = 'Helvetica'
+    fontFamily = 'Helvetica',
+    outputDir = path.join(process.cwd(), 'public', 'outputs')
   } = options;
 
-  logger.info('Generating PDF', { title });
+  logger.info('Generating PDF', { title, maxPages });
+
+  // Ensure output directory exists
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // Clean up old files (keep last 100)
+  cleanupOldFiles(outputDir, 100);
 
   return new Promise((resolve, reject) => {
     try {
+      // Parse JSON content
+      let resumeContent: ResumeContent;
+      try {
+        resumeContent = JSON.parse(content);
+      } catch (e) {
+        logger.warn('Failed to parse JSON, treating as plain text', { error: e });
+        resumeContent = { summary: content };
+      }
+
       // Create a document
       const doc = new PDFDocument({
         size: 'LETTER',
         margins: { top: 50, bottom: 50, left: 50, right: 50 },
-        info: {
-          Title: title,
-          Author: 'Resume Generator',
-          Subject: 'Generated Resume',
-          Keywords: 'resume, job application',
-          CreationDate: new Date(),
-        }
+        bufferPages: true // Enable page buffering for page count check
       });
+
+      // Generate unique file path
+      const id = uuidv4();
+      const filePath = path.join(outputDir, `${id}.pdf`);
+      const writeStream = fs.createWriteStream(filePath);
+      doc.pipe(writeStream);
 
       // Buffer to store PDF data
       const buffers: Buffer[] = [];
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => {
         const pdfData = Buffer.concat(buffers);
-        resolve(pdfData);
+        resolve({ buffer: pdfData, filePath });
       });
-
-      // Parse content
-      const sections = parseContent(content, originalContent);
 
       // Add title
-      doc.font(`${fontFamily}-Bold`).fontSize(18).text(title, { align: 'center' });
+      doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 4);
+      doc.text(title, { align: 'center' });
       doc.moveDown(1);
 
-      // Process each section
-      sections.forEach((section, index) => {
-        // Add section header if it exists
-        if (section.header) {
-          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
-          doc.text(section.header, { align: 'left' });
-          doc.moveDown(0.5);
-        }
+      // Track content that fits
+      let contentFits = true;
 
-        // Add section content with proper formatting
+      // Add summary
+      if (resumeContent.summary) {
         doc.font(fontFamily).fontSize(fontSize);
-        
-        // Process section content by lines
-        section.content.split('\n').forEach(line => {
-          const trimmedLine = line.trim();
-          
-          if (trimmedLine === '') {
-            doc.moveDown(0.5);
-          } else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-            // Handle bullet points with proper indentation
-            doc.text(trimmedLine, { indent: 10 });
-          } else if (trimmedLine.startsWith('#') || /^[A-Z\s]+:/.test(trimmedLine)) {
-            // Handle subheadings
-            doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
-            doc.text(trimmedLine.replace(/^#+\s+/, ''));
-            doc.font(fontFamily).fontSize(fontSize);
-          } else {
-            // Regular text
-            doc.text(trimmedLine);
-          }
-        });
+        doc.text(resumeContent.summary, { align: 'left' });
+        doc.moveDown(1);
+      }
 
-        // Add space between sections
-        if (index < sections.length - 1) {
+      // Add experience
+      if (resumeContent.experience?.length) {
+        doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
+        doc.text('EXPERIENCE', { align: 'left' });
+        doc.moveDown(0.5);
+
+        for (const exp of resumeContent.experience) {
+          if (doc.bufferedPageRange().count > maxPages) {
+            contentFits = false;
+            break;
+          }
+
+          doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
+          doc.text(exp.company || '', { continued: true });
+          doc.font(fontFamily).fontSize(fontSize);
+          doc.text(` - ${exp.role || ''}`, { align: 'left' });
+
+          if (exp.bullets?.length) {
+            doc.moveDown(0.5);
+            for (const bullet of exp.bullets) {
+              doc.text(`• ${bullet}`, { indent: 15, align: 'left' });
+            }
+          }
           doc.moveDown(1);
         }
-      });
+      }
 
-      // Add footer with page numbers
-      const pageCount = doc.bufferedPageRange().count;
-      for (let i = 0; i < pageCount; i++) {
+      // Add projects
+      if (resumeContent.projects?.length) {
+        if (doc.bufferedPageRange().count <= maxPages) {
+          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
+          doc.text('PROJECTS', { align: 'left' });
+          doc.moveDown(0.5);
+
+          for (const project of resumeContent.projects) {
+            if (doc.bufferedPageRange().count > maxPages) {
+              contentFits = false;
+              break;
+            }
+
+            doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
+            doc.text(project.name || '', { align: 'left' });
+
+            if (project.bullets?.length) {
+              doc.moveDown(0.5);
+              for (const bullet of project.bullets) {
+                doc.text(`• ${bullet}`, { indent: 15, align: 'left' });
+              }
+            }
+            doc.moveDown(1);
+          }
+        }
+      }
+
+      // Add skills
+      if (resumeContent.skills?.length) {
+        if (doc.bufferedPageRange().count <= maxPages) {
+          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
+          doc.text('SKILLS', { align: 'left' });
+          doc.moveDown(0.5);
+
+          doc.font(fontFamily).fontSize(fontSize);
+          doc.text(resumeContent.skills.join(', '), { align: 'left' });
+          doc.moveDown(1);
+        }
+      }
+
+      // Add education
+      if (resumeContent.education?.length) {
+        if (doc.bufferedPageRange().count <= maxPages) {
+          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
+          doc.text('EDUCATION', { align: 'left' });
+          doc.moveDown(0.5);
+
+          for (const edu of resumeContent.education) {
+            if (doc.bufferedPageRange().count > maxPages) {
+              contentFits = false;
+              break;
+            }
+
+            doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
+            doc.text(edu.school || '', { continued: true });
+            doc.font(fontFamily).fontSize(fontSize);
+            doc.text(` - ${edu.degree || ''} (${edu.year || ''})`, { align: 'left' });
+            doc.moveDown(0.5);
+          }
+        }
+      }
+
+      // If content didn't fit, add a note
+      if (!contentFits) {
+        doc.font(fontFamily).fontSize(8);
+        doc.text('Note: Some content was truncated to fit page limit.', {
+          align: 'center',
+          color: 'gray'
+        });
+      }
+
+      // Add page numbers
+      const pages = doc.bufferedPageRange().count;
+      for (let i = 0; i < pages; i++) {
         doc.switchToPage(i);
-        doc.fontSize(8).text(
-          `Page ${i + 1} of ${pageCount}`,
+        
+        // Add page number at bottom
+        doc.font(fontFamily).fontSize(8);
+        doc.text(
+          `Page ${i + 1} of ${pages}`,
           50,
           doc.page.height - 50,
-          { align: 'center' }
+          {
+            align: 'center',
+            width: doc.page.width - 100
+          }
         );
       }
 
@@ -118,156 +230,28 @@ export async function generatePdf(options: PdfGenerateOptions): Promise<Buffer> 
 }
 
 /**
- * Parse content into structured sections for better formatting
+ * Clean up old files in the output directory
  */
-function parseContent(content: string, originalContent?: string): Array<{ header?: string; content: string }> {
-  // Default structure if we can't parse properly
-  if (!content) {
-    return [{ content: originalContent || 'No content provided' }];
-  }
+function cleanupOldFiles(directory: string, keepCount: number) {
+  try {
+    const files = fs.readdirSync(directory)
+      .map(file => ({
+        name: file,
+        path: path.join(directory, file),
+        mtime: fs.statSync(path.join(directory, file)).mtime
+      }))
+      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-  // Try to preserve original structure if available
-  if (originalContent) {
-    // Extract potential section headers from original content
-    const originalHeaders = extractSectionHeaders(originalContent);
-    
-    // If we have original headers, try to maintain that structure
-    if (originalHeaders.length > 0) {
-      return structureByOriginalHeaders(content, originalHeaders);
-    }
-  }
-
-  // Otherwise, parse markdown-style sections
-  return parseMarkdownSections(content);
-}
-
-/**
- * Extract potential section headers from original content
- */
-function extractSectionHeaders(text: string): string[] {
-  const lines = text.split('\n');
-  const headers: string[] = [];
-  
-  // Look for potential section headers (all caps, short lines)
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (
-      trimmed.length > 0 && 
-      trimmed.length < 30 && 
-      trimmed === trimmed.toUpperCase() &&
-      !/^\d+$/.test(trimmed) // Not just a number
-    ) {
-      headers.push(trimmed);
-    }
-  }
-  
-  return headers;
-}
-
-/**
- * Structure content based on original headers
- */
-function structureByOriginalHeaders(content: string, headers: string[]): Array<{ header?: string; content: string }> {
-  const sections: Array<{ header?: string; content: string }> = [];
-  let currentContent = '';
-  
-  // Split content into lines
-  const lines = content.split('\n');
-  
-  // Process each line
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    
-    // Check if this line matches a header pattern
-    const isHeader = headers.some(header => 
-      trimmed.toUpperCase().includes(header) || 
-      header.includes(trimmed.toUpperCase())
-    );
-    
-    if (isHeader && currentContent) {
-      // Save previous section
-      sections.push({ content: currentContent });
-      currentContent = '';
-      
-      // Add new section with header
-      sections.push({ header: trimmed, content: '' });
-    } else if (sections.length > 0) {
-      // Add to current section
-      sections[sections.length - 1].content += line + '\n';
-    } else {
-      // Add to initial content
-      currentContent += line + '\n';
-    }
-  }
-  
-  // Add any remaining content
-  if (currentContent) {
-    sections.push({ content: currentContent });
-  }
-  
-  return sections;
-}
-
-/**
- * Parse markdown-style sections from content
- */
-function parseMarkdownSections(content: string): Array<{ header?: string; content: string }> {
-  const sections: Array<{ header?: string; content: string }> = [];
-  const lines = content.split('\n');
-  
-  let currentHeader: string | undefined;
-  let currentContent = '';
-  
-  for (const line of lines) {
-    // Check for markdown headers
-    if (line.startsWith('# ')) {
-      // Save previous section if it exists
-      if (currentContent) {
-        sections.push({ header: currentHeader, content: currentContent });
-        currentContent = '';
-      }
-      
-      // Start new section
-      currentHeader = line.substring(2).trim();
-    } else if (line.startsWith('## ')) {
-      // Subheader - add as part of content
-      currentContent += line.substring(3).trim() + '\n';
-    } else {
-      // Regular content
-      currentContent += line + '\n';
-    }
-  }
-  
-  // Add final section
-  if (currentContent) {
-    sections.push({ header: currentHeader, content: currentContent });
-  }
-  
-  return sections;
-}
-
-/**
- * Save PDF to disk and return the file path
- */
-export async function savePdfToDisk(pdfBuffer: Buffer, filename: string): Promise<string> {
-  const id = uuidv4();
-  const outputDir = path.join(process.cwd(), 'public', 'outputs');
-  
-  // Ensure output directory exists
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-  
-  const filePath = path.join(outputDir, `${id}_${filename}.pdf`);
-  
-  return new Promise((resolve, reject) => {
-    fs.writeFile(filePath, pdfBuffer, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(filePath);
+    // Delete files beyond the keep count
+    files.slice(keepCount).forEach(file => {
+      try {
+        fs.unlinkSync(file.path);
+        logger.info('Cleaned up old file', { file: file.name });
+      } catch (e) {
+        logger.warn('Failed to delete old file', { file: file.name, error: e });
       }
     });
-  });
+  } catch (error) {
+    logger.error('Error cleaning up old files', { error });
+  }
 }

@@ -1,19 +1,29 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('resume-generator');
 
 type ProcessingStatus = 'idle' | 'extracting' | 'rewriting' | 'formatting' | 'done' | 'error';
-type AIProvider = 'auto' | 'google' | 'openai' | 'anthropic';
+type AIProvider = 'auto' | 'openrouter' | 'google' | 'openai' | 'anthropic';
 
 interface DebugLog {
   timestamp: number;
   level: 'info' | 'error';
   message: string;
   details?: any;
+}
+
+interface ValidationError {
+  path: string;
+  message: string;
+}
+
+interface APIError {
+  message: string;
+  details?: ValidationError[] | string;
 }
 
 interface ATSScore {
@@ -28,6 +38,16 @@ const AI_PROVIDERS = {
   auto: {
     name: 'Auto (Best)',
     models: ['default']
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    models: [
+      'anthropic/claude-3-opus',
+      'anthropic/claude-3-sonnet',
+      'meta-llama/llama-2-70b-chat',
+      'google/gemini-pro',
+      'mistral/mistral-large'
+    ]
   },
   google: {
     name: 'Google',
@@ -76,35 +96,6 @@ export function ResumeGenerator() {
     maxFiles: 1
   });
 
-  // Try to extract job description from URL
-  useEffect(() => {
-    if (jobUrl && !jobDescription) {
-      addDebugLog('info', 'Attempting to extract job description from URL', { url: jobUrl });
-      setStatus('extracting');
-      
-      fetch('/api/extract-job', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: jobUrl })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.text) {
-          setJobDescription(data.text);
-          addDebugLog('info', 'Successfully extracted job description', { length: data.text.length });
-        } else {
-          addDebugLog('error', 'Failed to extract job description', { error: data.error });
-        }
-      })
-      .catch(err => {
-        addDebugLog('error', 'Error extracting job description', { error: err.message });
-      })
-      .finally(() => {
-        setStatus('idle');
-      });
-    }
-  }, [jobUrl, jobDescription, addDebugLog]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
@@ -120,14 +111,30 @@ export function ResumeGenerator() {
     try {
       setStatus('extracting');
       setError(null);
-      addDebugLog('info', 'Starting resume processing', { provider, model });
+      addDebugLog('info', 'Starting resume processing', { 
+        provider, 
+        model,
+        hasJobUrl: Boolean(jobUrl),
+        hasJobDescription: Boolean(jobDescription)
+      });
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('jobDescription', jobDescription);
-      formData.append('jobUrl', jobUrl);
+      
+      // Always send both, let backend handle validation
+      formData.append('jobDescription', jobDescription || '');
+      formData.append('jobUrl', jobUrl || '');
+      
       formData.append('provider', provider);
       formData.append('model', model);
+
+      addDebugLog('info', 'Sending form data', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        jobUrlLength: jobUrl?.length || 0,
+        jobDescriptionLength: jobDescription?.length || 0
+      });
 
       setStatus('rewriting');
       const response = await fetch('/api/resume/generate', {
@@ -135,29 +142,54 @@ export function ResumeGenerator() {
         body: formData
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Resume processing failed');
+        const apiError = data.error as APIError;
+        let errorMessage = apiError.message;
+        
+        // Handle validation errors
+        if (Array.isArray(apiError.details)) {
+          errorMessage += '\n' + apiError.details
+            .map(err => `${err.path}: ${err.message}`)
+            .join('\n');
+          
+          addDebugLog('error', 'Validation errors', { details: apiError.details });
+        } else if (apiError.details) {
+          errorMessage += '\n' + apiError.details;
+          addDebugLog('error', 'API error details', { details: apiError.details });
+        }
+        
+        throw new Error(errorMessage);
       }
 
       setStatus('formatting');
-      const result = await response.json();
+      addDebugLog('info', 'Processing response', {
+        hasResumeUrl: Boolean(data.resumeUrl),
+        hasCoverLetterUrl: Boolean(data.coverLetterUrl),
+        hasAts: Boolean(data.ats)
+      });
       
       setStatus('done');
       setDownloads({
-        resumeUrl: result.resumeUrl || result.pdfUrl,
-        coverLetterUrl: result.coverLetterUrl
+        resumeUrl: data.resumeUrl,
+        coverLetterUrl: data.coverLetterUrl
       });
       
-      if (result.ats) {
-        setAtsScore(result.ats);
+      if (data.ats) {
+        setAtsScore(data.ats);
       }
       
-      addDebugLog('info', 'Processing completed successfully', result);
+      addDebugLog('info', 'Processing completed successfully', {
+        provider: data.providerUsed,
+        model: data.modelUsed,
+        atsScore: data.ats?.score
+      });
     } catch (error: any) {
       setStatus('error');
-      setError(error.message);
-      addDebugLog('error', 'Processing failed', { error: error.message });
+      const errorMessage = error.message || 'An unexpected error occurred';
+      setError(errorMessage);
+      addDebugLog('error', 'Processing failed', { error: errorMessage });
     }
   };
 

@@ -11,12 +11,43 @@ interface ATSReport {
   suggestions?: string[];
 }
 
+interface ResumeContent {
+  summary?: string;
+  experience?: Array<{
+    company?: string;
+    role?: string;
+    bullets?: string[];
+  }>;
+  projects?: Array<{
+    name?: string;
+    bullets?: string[];
+  }>;
+  skills?: string[];
+  education?: Array<{
+    school?: string;
+    degree?: string;
+    year?: string;
+  }>;
+}
+
 /**
  * Analyzes resume content against job description to generate an ATS compatibility report
  */
 export async function generateAtsReport(resumeContent: string, jobDescription: string): Promise<ATSReport> {
   try {
     logger.info('Generating ATS report');
+    
+    // Parse resume content
+    let parsedContent: ResumeContent;
+    try {
+      parsedContent = JSON.parse(resumeContent);
+    } catch (e) {
+      logger.warn('Failed to parse JSON, treating as plain text', { error: e });
+      parsedContent = { summary: resumeContent };
+    }
+
+    // Extract text from resume content
+    const resumeText = extractTextFromContent(parsedContent);
     
     // Extract keywords from job description
     const keywords = extractKeywords(jobDescription);
@@ -33,7 +64,7 @@ export async function generateAtsReport(resumeContent: string, jobDescription: s
     
     // Check which keywords are present in the resume
     const matches = keywords.filter(keyword => 
-      resumeContent.toLowerCase().includes(keyword.toLowerCase())
+      resumeText.toLowerCase().includes(keyword.toLowerCase())
     );
     
     // Calculate score
@@ -41,13 +72,18 @@ export async function generateAtsReport(resumeContent: string, jobDescription: s
     
     // Get missing keywords
     const missingKeywords = keywords.filter(keyword => 
-      !resumeContent.toLowerCase().includes(keyword.toLowerCase())
+      !resumeText.toLowerCase().includes(keyword.toLowerCase())
     );
     
     // Generate suggestions
     const suggestions = generateSuggestions(missingKeywords);
     
-    logger.info('ATS report generated', { score, matches: matches.length, total: keywords.length });
+    logger.info('ATS report generated', { 
+      score, 
+      matches: matches.length, 
+      total: keywords.length,
+      textLength: resumeText.length
+    });
     
     return {
       score,
@@ -68,6 +104,50 @@ export async function generateAtsReport(resumeContent: string, jobDescription: s
       keywords: []
     };
   }
+}
+
+/**
+ * Extract text from resume content
+ */
+function extractTextFromContent(content: ResumeContent): string {
+  const parts: string[] = [];
+
+  // Add summary
+  if (content.summary) {
+    parts.push(content.summary);
+  }
+
+  // Add experience
+  if (content.experience?.length) {
+    content.experience.forEach(exp => {
+      if (exp.company) parts.push(exp.company);
+      if (exp.role) parts.push(exp.role);
+      if (exp.bullets?.length) parts.push(...exp.bullets);
+    });
+  }
+
+  // Add projects
+  if (content.projects?.length) {
+    content.projects.forEach(project => {
+      if (project.name) parts.push(project.name);
+      if (project.bullets?.length) parts.push(...project.bullets);
+    });
+  }
+
+  // Add skills
+  if (content.skills?.length) {
+    parts.push(...content.skills);
+  }
+
+  // Add education
+  if (content.education?.length) {
+    content.education.forEach(edu => {
+      if (edu.school) parts.push(edu.school);
+      if (edu.degree) parts.push(edu.degree);
+    });
+  }
+
+  return parts.join(' ');
 }
 
 /**

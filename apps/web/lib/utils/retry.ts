@@ -2,14 +2,7 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('retry');
 
-/**
- * Retries a function with exponential backoff
- * @param fn Function to retry
- * @param maxRetries Maximum number of retries
- * @param initialDelay Initial delay in milliseconds
- * @returns Result of the function
- */
-export async function retryWithBackoff<T>(
+export async function withBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
   initialDelay: number = 1000
@@ -47,3 +40,6 @@ export async function retryWithBackoff<T>(
     }
   }
 }
+
+// Alias for backward compatibility
+export { withBackoff as retryWithBackoff };

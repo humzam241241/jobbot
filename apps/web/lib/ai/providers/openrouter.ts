@@ -1,91 +1,142 @@
-import type { AIProvider, AIModel, AIResponse } from "../types";
+import OpenAI from 'openai';
+import { retryWithBackoff as withBackoff } from "@/lib/utils/retry";
+import { createLogger } from '@/lib/logger';
 
-export class OpenRouterProvider implements AIProvider {
-  name = "OpenRouter";
-  models: AIModel[] = ["openrouter/deepseek-chat", "openrouter/gpt-4o-mini"];
+const logger = createLogger('openrouter-provider');
 
-  async isAvailable(): Promise<boolean> {
-    return !!process.env.OPENROUTER_API_KEY;
-  }
+const client = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  baseURL: 'https://openrouter.ai/api/v1',
+});
 
-  private async complete(prompt: string, model: AIModel): Promise<AIResponse> {
-    const modelId = model === "openrouter/deepseek-chat" 
-      ? "deepseek-ai/deepseek-chat-33b"
-      : "openai/gpt-4-turbo-preview";
+// Accepts { model, jobDescription, resumeMarkdown, temperature, maxTokens }
+export async function openrouterRewrite(args: {
+  model?: string;
+  jobDescription: string;
+  resumeMarkdown: string;
+  temperature?: number;
+  maxTokens?: number;
+}) {
+  const modelId = args.model ?? "anthropic/claude-3-opus";
+  try {
+    logger.info('Initializing OpenRouter request', { modelId });
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.VERCEL_URL || "http://localhost:3000",
-        "X-Title": "JobBot Resume Generator"
-      },
-      body: JSON.stringify({
-        model: modelId,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 4000
-      })
-    });
+    const prompt = `You are an expert resume writer and technical recruiter at a fast-growing startup. Your task is to optimize the following resume for the provided job description.
+Keep the resume ATS-friendly and under one page. Focus on results, impact, and clarity.
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status}`);
-    }
+Rules:
+1. Focus on results, impact, and clarity
+2. Turn personal projects into business-value statements
+3. Use action verbs, measurable outcomes, and correct industry terminology
+4. Highlight transferable skills from non-tech experience when relevant
+5. Preserve EXACT section structure and headings from the original (do not add new sections)
+6. Keep it ATS-friendly and concise (<= 1 page when rendered)
+7. Return ONLY a JSON object with the exact structure shown below, no other text
 
-    const data = await response.json();
-    return {
-      text: data.choices[0].message.content,
-      model: modelId,
-      provider: this.name
-    };
-  }
-
-  async generateResume(text: string, jd: string, model: AIModel): Promise<string> {
-    const prompt = `You are an expert resume writer. Tailor this resume to match the job description, while keeping all information truthful and verifiable. Only use information present in the original resume.
+Job Description:
+${args.jobDescription}
 
 Original Resume:
-${text}
+${args.resumeMarkdown}
 
-Job Description:
-${jd}
+You must respond with ONLY a JSON object in this exact format (no markdown fencing or other text):
+{
+  "summary": "Brief professional summary",
+  "experience": [
+    {
+      "company": "Company name",
+      "role": "Role title",
+      "bullets": ["Achievement 1", "Achievement 2"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project name",
+      "bullets": ["Key achievement 1", "Key achievement 2"]
+    }
+  ],
+  "skills": ["Skill 1", "Skill 2"],
+  "coverLetter": "Full cover letter text that matches the job description and highlights key qualifications"
+}`;
 
-Instructions:
-1. Keep the same basic structure and sections
-2. Rewrite bullets to emphasize relevant skills and experiences
-3. Use keywords from the job description where they match the original content
-4. Do not invent or fabricate any information
-5. Focus on quantifiable achievements
-6. Use active voice and strong verbs
-7. Return ONLY the tailored resume text, no comments or explanations
+    logger.info('Sending request to OpenRouter', { 
+      promptLength: prompt.length,
+      temperature: args.temperature,
+      maxTokens: args.maxTokens
+    });
 
-Tailored Resume:`;
+    const result = await withBackoff(() =>
+      client.chat.completions.create({
+        model: modelId,
+        messages: [
+          { role: "user", content: prompt }
+        ],
+        temperature: args.temperature ?? 0.2,
+        max_tokens: args.maxTokens ?? 2000,
+        response_format: { type: "json_object" }
+      })
+    );
 
-    const response = await this.complete(prompt, model);
-    return response.text;
-  }
+    const text = result.choices[0]?.message?.content ?? "";
+    if (!text) {
+      logger.error('No content received from OpenRouter');
+      throw new Error("NO_CONTENT_FROM_OPENROUTER");
+    }
 
-  async generateCoverLetter(text: string, jd: string, model: AIModel): Promise<string> {
-    const prompt = `You are an expert cover letter writer. Write a cover letter based on this resume and job description. Only use information that appears in the resume - do not fabricate or embellish.
+    // Try to parse as JSON to validate
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed.summary || !parsed.experience) {
+        logger.error('Invalid JSON structure', { parsed });
+        throw new Error("Invalid JSON structure");
+      }
+      
+      logger.info('Successfully parsed response', {
+        sections: Object.keys(parsed),
+        summaryLength: parsed.summary.length,
+        experienceCount: parsed.experience.length
+      });
+    } catch (e) {
+      logger.error('Failed to parse OpenRouter response as JSON', { 
+        error: e,
+        text: text.slice(0, 100) + '...'
+      });
+      throw new Error("INVALID_JSON_FROM_OPENROUTER");
+    }
 
-Resume:
-${text}
+    logger.info('Successfully generated content', { 
+      responseLength: text.length,
+      modelId 
+    });
 
-Job Description:
-${jd}
+    return { 
+      ok: true as const, 
+      content: text, 
+      modelUsed: modelId, 
+      providerUsed: "openrouter" 
+    };
+  } catch (e: any) {
+    logger.error('OpenRouter generation failed', {
+      error: {
+        message: e.message,
+        code: e.code,
+        status: e.status,
+        details: e.details
+      }
+    });
 
-Instructions:
-1. Use a professional business letter format
-2. Focus on specific, verifiable achievements from the resume
-3. Connect resume experiences to job requirements
-4. Keep it concise - no more than 3-4 paragraphs
-5. Use formal but natural language
-6. Do not invent or fabricate any information
-7. Return ONLY the cover letter text, no comments or explanations
-
-Cover Letter:`;
-
-    const response = await this.complete(prompt, model);
-    return response.text;
+    return {
+      ok: false as const,
+      error: {
+        code: String(e?.status ?? e?.code ?? "OPENROUTER_ERROR"),
+        message: e?.message || "OpenRouter request failed.",
+        raw: {
+          message: e.message,
+          code: e.code,
+          status: e.status,
+          details: e.details
+        },
+      },
+    };
   }
 }

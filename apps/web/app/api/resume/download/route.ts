@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     // Construct file path
     const outputDir = path.join(process.cwd(), 'public', 'outputs');
-    const fileName = `${id}_${type === 'resume' ? 'resume' : 'cover_letter'}.pdf`;
+    const fileName = `${id}.pdf`;
     const filePath = path.join(outputDir, fileName);
 
     // Check if file exists
@@ -37,15 +37,23 @@ export async function GET(req: NextRequest) {
     // Set appropriate headers
     const headers = new Headers();
     headers.set('Content-Type', 'application/pdf');
-    headers.set('Content-Disposition', `attachment; filename="${fileName}"`);
+    headers.set('Content-Disposition', `attachment; filename="${type === 'resume' ? 'resume' : 'cover_letter'}.pdf"`);
     headers.set('Content-Length', fileBuffer.length.toString());
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
 
     return new NextResponse(fileBuffer, {
       status: 200,
       headers
     });
   } catch (error: any) {
-    logger.error('Error downloading file', { error });
+    logger.error('Error downloading file', { 
+      error: {
+        message: error.message,
+        stack: error.stack
+      }
+    });
     return new NextResponse('Error downloading file', { status: 500 });
   }
 }
