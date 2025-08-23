@@ -23,6 +23,25 @@ JobBot is a full-stack application that helps job seekers optimize their resumes
 
 - Node.js v18 or later
 - PNPM package manager (`npm install -g pnpm`)
+- PostgreSQL database (optional - see Development without Database below)
+
+### Development without Database
+
+You can run the application without a database by setting the `SKIP_DB` environment variable:
+
+```bash
+# PowerShell
+$env:SKIP_DB="1"
+pnpm -C apps/web dev -p 3000
+
+# CMD
+set SKIP_DB=1 && pnpm -C apps/web dev -p 3000
+```
+
+### With Database
+
+- Node.js v18 or later
+- PNPM package manager (`npm install -g pnpm`)
 - PostgreSQL database
 - Git
 

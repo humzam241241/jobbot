@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import PDFDocument from "pdfkit";
 import MarkdownIt from "markdown-it";
 import { createLogger } from '@/lib/logger';
+import { prepareFonts } from './fonts';
 
 const logger = createLogger('pdf-generator');
 const md = new MarkdownIt();
@@ -56,12 +57,39 @@ function writeMarkdownPdf(markdown: string, filename: string) {
     const stream = fs.createWriteStream(full);
     doc.pipe(stream);
 
+    // Initialize fonts
+    const { useFont } = prepareFonts(doc);
+    logger.info('[pdf] PDF font pipeline initialized');
+
     // Convert markdown to HTML and strip tags for ATS-friendly text
     const html = md.render(markdown);
     const stripped = html
       .replace(/<[^>]+>/g, "") // strip tags
       .replace(/\&nbsp;/g, " ")
       .trim();
+
+    // Helper functions for consistent text styling
+    function h1(text: string) { 
+      useFont('bold'); 
+      doc.fontSize(16).text(text); 
+      useFont('regular');
+    }
+
+    function h2(text: string) {
+      useFont('bold');
+      doc.fontSize(14).text(text);
+      useFont('regular');
+    }
+
+    function p(text: string) {
+      useFont('regular');
+      doc.fontSize(11).text(text);
+    }
+
+    function bullet(text: string) {
+      useFont('regular');
+      doc.fontSize(11).text(text, { indent: 20 });
+    }
 
     // Process each line
     stripped.split("\n").forEach(line => {
@@ -75,19 +103,23 @@ function writeMarkdownPdf(markdown: string, filename: string) {
       if (trimmed.match(/^#{1,6}\s/)) {
         const level = trimmed.match(/^(#{1,6})\s/)?.[1].length || 1;
         const text = trimmed.replace(/^#{1,6}\s/, '');
-        doc.fontSize(14 - level).font('Helvetica-Bold').text(text);
+        if (level === 1) {
+          h1(text);
+        } else {
+          h2(text);
+        }
         doc.moveDown(0.5);
         return;
       }
 
       // Handle bullet points
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        doc.fontSize(11).font('Helvetica').text(trimmed, { indent: 20 });
+        bullet(trimmed);
         return;
       }
 
       // Regular text
-      doc.fontSize(11).font('Helvetica').text(trimmed, { paragraphGap: 4 });
+      p(trimmed);
     });
 
     doc.end();
