@@ -183,23 +183,60 @@ function writeMarkdownPdf(markdown: string, filename: string) {
   }
 }
 
-export function generateResumeKitPdfs(args: {
-  resume_markdown: string;
-  cover_letter_markdown: string;
-  ats_report: {
-    score: number;
-    matched_keywords: string[];
-    missing_keywords: string[];
-    notes: string[];
-  };
-}) {
+export async function generateResumeKitPdfs(
+  args: {
+    resume_markdown: string;
+    cover_letter_markdown: string;
+    ats_report: {
+      overallScore: number;
+      keywordCoverage: { 
+        matched: string[], 
+        missingCritical: string[], 
+        niceToHave: string[] 
+      };
+      sectionScores: { 
+        summary: number,
+        skills: number,
+        experience: number,
+        projects: number,
+        education: number
+      };
+      redFlags: string[];
+      lengthAndFormatting: { 
+        pageCountOK: boolean, 
+        lineSpacingOK: boolean, 
+        bulletsOK: boolean 
+      };
+      concreteEdits: Array<{ 
+        section: string, 
+        before: string, 
+        after: string 
+      }>;
+      finalRecommendations: string[];
+    };
+  },
+  formatPreservedPdf: Uint8Array | null = null,
+  kitId?: string
+) {
   logger.info('Generating resume kit PDFs');
 
   try {
-    const id = uuidv4().slice(0, 8);
-
-    // Generate resume PDF
-    const resume = writeMarkdownPdf(args.resume_markdown, `resume-${id}.pdf`);
+    const id = kitId || uuidv4().slice(0, 8);
+    
+    // Generate resume PDF (use format-preserved if available)
+    let resume;
+    if (formatPreservedPdf) {
+      // Save the format-preserved PDF
+      const outDir = ensureOutDir();
+      const filename = `resume-${id}.pdf`;
+      const full = path.join(outDir, filename);
+      fs.writeFileSync(full, formatPreservedPdf);
+      resume = { path: full, url: `/generated/${filename}` };
+      logger.info('Saved format-preserved PDF', { path: full });
+    } else {
+      // Fall back to standard PDF generation
+      resume = writeMarkdownPdf(args.resume_markdown, `resume-${id}.pdf`);
+    }
 
     // Generate cover letter PDF
     const cover = writeMarkdownPdf(args.cover_letter_markdown, `cover-letter-${id}.pdf`);
@@ -207,17 +244,58 @@ export function generateResumeKitPdfs(args: {
     // Generate ATS report PDF
     const atsLines: string[] = [];
     atsLines.push(`# ATS Report`);
-    atsLines.push(`Score: ${Math.round(args.ats_report.score)}/100`);
+    atsLines.push(`Overall Score: ${Math.round(args.ats_report.overallScore)}/100`);
     atsLines.push(``);
+    
+    // Section scores
+    atsLines.push(`## Section Scores`);
+    atsLines.push(`- Summary: ${args.ats_report.sectionScores.summary}/10`);
+    atsLines.push(`- Skills: ${args.ats_report.sectionScores.skills}/10`);
+    atsLines.push(`- Experience: ${args.ats_report.sectionScores.experience}/10`);
+    atsLines.push(`- Projects: ${args.ats_report.sectionScores.projects}/10`);
+    atsLines.push(`- Education: ${args.ats_report.sectionScores.education}/10`);
+    atsLines.push(``);
+    
+    // Keyword coverage
     atsLines.push(`## Matched Keywords`);
-    atsLines.push(args.ats_report.matched_keywords.join(", ") || "—");
+    atsLines.push(args.ats_report.keywordCoverage.matched.join(", ") || "—");
     atsLines.push(``);
-    atsLines.push(`## Missing Keywords`);
-    atsLines.push(args.ats_report.missing_keywords.join(", ") || "—");
+    
+    atsLines.push(`## Missing Critical Keywords`);
+    atsLines.push(args.ats_report.keywordCoverage.missingCritical.join(", ") || "—");
     atsLines.push(``);
-    atsLines.push(`## Notes`);
-    if (args.ats_report.notes?.length) {
-      args.ats_report.notes.forEach(n => atsLines.push(`- ${n}`));
+    
+    atsLines.push(`## Nice-to-Have Keywords`);
+    atsLines.push(args.ats_report.keywordCoverage.niceToHave.join(", ") || "—");
+    atsLines.push(``);
+    
+    // Red flags
+    atsLines.push(`## Red Flags`);
+    if (args.ats_report.redFlags?.length) {
+      args.ats_report.redFlags.forEach(flag => atsLines.push(`- ${flag}`));
+    } else {
+      atsLines.push("—");
+    }
+    atsLines.push(``);
+    
+    // Concrete edits
+    atsLines.push(`## Suggested Improvements`);
+    if (args.ats_report.concreteEdits?.length) {
+      args.ats_report.concreteEdits.forEach(edit => {
+        atsLines.push(`### ${edit.section}`);
+        atsLines.push(`Before: ${edit.before}`);
+        atsLines.push(`After: ${edit.after}`);
+        atsLines.push(``);
+      });
+    } else {
+      atsLines.push("—");
+    }
+    atsLines.push(``);
+    
+    // Final recommendations
+    atsLines.push(`## Final Recommendations`);
+    if (args.ats_report.finalRecommendations?.length) {
+      args.ats_report.finalRecommendations.forEach(rec => atsLines.push(`- ${rec}`));
     } else {
       atsLines.push("—");
     }

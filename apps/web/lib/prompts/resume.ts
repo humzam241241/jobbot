@@ -14,23 +14,48 @@ export function resumeSuperPrompt(args: {
   });
 
   return `
-Act as a technical recruiter at a fast-growing startup.
+You are a technical recruiter at a fast-growing startup.
 
-You will transform the *content* of the candidate's resume while preserving the original layout/sections (Contact, Summary/Objective, Skills, Experience, Projects, Education). Do **not** invent employers or degrees. Rewrite bullet points only—use strong action verbs, measurable outcomes, and correct industry terminology. Maintain ATS-friendly structure, concise phrasing, and keep it under one page.
+Task: Given (1) the candidate's input resume and (2) a target job description, output a SINGLE-PAGE resume that:
+- Preserves the original section order and structure as much as possible.
+- Uses clear, scannable bullets with strong action verbs.
+- Converts projects into business-value statements with measurable outcomes.
+- Highlights transferable skills from non-technical roles.
+- Is tightly tailored to the JD (keywords, responsibilities).
+- Enforces a one-page limit; remove low-signal content when needed.
+- Uses **bold text** for important keywords and section headers.
+- Maintains proper bullet points (•) for all list items.
 
-If relevant, highlight transferable skills from non-tech experience. Convert personal projects into statements of business value (impact, metrics, user outcomes, cost savings, reliability gains, etc.). Keep dates, titles, and employer names as-is unless obviously malformed.
-
-Also produce a targeted cover letter for the given job, and an ATS report that scores keyword alignment to the job description.
+Also produce a targeted cover letter for the given job, and a comprehensive ATS report.
 
 Return STRICT JSON with this schema:
 {
   "resume_markdown": string,   // Markdown that mirrors the original order of sections
   "cover_letter_markdown": string,
   "ats_report": {
-    "score": number,           // 0..100
-    "matched_keywords": string[],
-    "missing_keywords": string[],
-    "notes": string[]
+    "overallScore": number,    // 0-100
+    "keywordCoverage": { 
+      "matched": string[], 
+      "missingCritical": string[], 
+      "niceToHave": string[] 
+    },
+    "sectionScores": { 
+      "summary": number,       // 0-10 
+      "skills": number,        // 0-10
+      "experience": number,    // 0-10
+      "projects": number,      // 0-10
+      "education": number      // 0-10
+    },
+    "redFlags": string[],
+    "lengthAndFormatting": { 
+      "pageCountOK": boolean, 
+      "lineSpacingOK": boolean, 
+      "bulletsOK": boolean 
+    },
+    "concreteEdits": [
+      { "section": string, "before": string, "after": string }
+    ],
+    "finalRecommendations": string[]
   }
 }
 
@@ -46,10 +71,12 @@ ${jobDescriptionText}
 <<<END JOB>>>
 
 Rules:
-- Preserve the original section order and headings if present.
-- Use short bullets; start with action verbs; quantify results where plausible.
-- Prefer industry terms used in the job description when appropriate.
-- Keep page-length constraints by removing less-relevant bullets first.
+- Focus on results and metrics; quantify wherever honest.
+- Avoid fluff and generic claims.
+- Keep bullets short; favor impact/tech keywords used in the JD.
+- The total content must comfortably fit on one page when laid into the original template boxes.
+- Use **bold** markdown for important keywords, skills, and metrics.
+- Always use bullet points (•) for list items.
 - Do not return anything except the JSON object.
 `;
 }

@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import FileUpload from "@/components/ui/FileUpload";
 import ModelSelector from "@/components/ui/ModelSelector";
 import UsagePill from "@/components/ui/UsagePill";
 import ErrorDetails from "@/components/ErrorDetails";
 import { createDevLogger } from "@/lib/utils/devLogger";
+import { toast } from "react-hot-toast";
+import { safePostForm, ApiError } from "@/lib/utils/apiErrorHandler";
 
 const logger = createDevLogger("ui:resumeKitForm");
 
@@ -40,6 +43,7 @@ interface ApiSuccess {
 }
 
 export default function EnhancedResumeKitForm() {
+  const router = useRouter();
   const [result, setResult] = useState<ApiSuccess | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,28 +94,71 @@ export default function EnhancedResumeKitForm() {
       }
 
       try {
-        const response = await fetch("/api/resume/generate", {
-          method: "POST",
-          body: formData
-        });
+        // Use our safe form post utility with enhanced error handling
+        const data = await safePostForm("/api/resume/generate", formData);
         
-        const data = await response.json();
+        // Log successful response for debugging
+        logger.info('API response received', {
+          ok: data.ok,
+          hasUsage: !!data.usage,
+          hasKitId: !!data.kitId,
+          provider: data.provider
+        });
         
         if (data.ok) {
           setResult(data);
           if (data.usage) {
             setUsageData(data.usage);
           }
+          
+          // Show loading toast
+          toast.loading("Finalizing your resume kit...");
+          
+          // Redirect to the result page
+          if (data.kitId) {
+            router.push(`/jobbot/result/${data.kitId}`);
+          } else {
+            // Fallback to the old way if kitId is not available
+            setResult(data);
+          }
         } else {
+          logger.error('API returned error response', {
+            error: data.error
+          });
           setError(data);
+          toast.error(data.error?.message || "Failed to generate resume kit");
         }
       } catch (err: any) {
-        setError({
-          ok: false,
-          code: 'REQUEST_FAILED',
-          message: err.message || 'Failed to send request'
-        });
-        logger.error("Error submitting form:", err);
+        // Enhanced error handling for API errors
+        if (err instanceof ApiError) {
+          logger.error("API error:", {
+            status: err.status,
+            code: err.code,
+            message: err.message,
+            details: err.details
+          });
+          
+          setError({
+            ok: false,
+            code: err.code || 'API_ERROR',
+            message: err.message,
+            details: err.details
+          });
+          
+          // Show error toast with specific message
+          toast.error(err.message || 'Failed to generate resume kit');
+        } else {
+          // Generic error handling
+          logger.error("Error submitting form:", err);
+          
+          setError({
+            ok: false,
+            code: 'REQUEST_FAILED',
+            message: err.message || 'Failed to send request'
+          });
+          
+          toast.error('An unexpected error occurred. Please try again.');
+        }
       }
     } catch (err: any) {
       setError({
@@ -134,7 +181,6 @@ export default function EnhancedResumeKitForm() {
         maxSize={5 * 1024 * 1024}
         label="Upload your resume (PDF or DOCX)"
         onChange={setSelectedFile}
-        selectedFile={selectedFile}
       />
 
       {/* Job Description */}
