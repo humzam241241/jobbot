@@ -1,249 +1,28 @@
-import PDFDocument from 'pdfkit';
+import fs from "node:fs";
+import path from "node:path";
+import { v4 as uuidv4 } from "uuid";
+import PDFDocument from "pdfkit";
+import MarkdownIt from "markdown-it";
 import { createLogger } from '@/lib/logger';
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 const logger = createLogger('pdf-generator');
+const md = new MarkdownIt();
 
-interface PdfGenerateOptions {
-  content: string;
-  title?: string;
-  maxPages?: number;
-  fontSize?: number;
-  fontFamily?: string;
-  outputDir?: string;
-}
-
-interface ResumeContent {
-  summary?: string;
-  experience?: Array<{
-    company?: string;
-    role?: string;
-    bullets?: string[];
-  }>;
-  projects?: Array<{
-    name?: string;
-    bullets?: string[];
-  }>;
-  skills?: string[];
-  education?: Array<{
-    school?: string;
-    degree?: string;
-    year?: string;
-  }>;
-}
-
-/**
- * Generates a PDF from content with strict page limit
- */
-export async function generatePdf(options: PdfGenerateOptions): Promise<{ buffer: Buffer; filePath: string }> {
-  const {
-    content,
-    title = 'Generated Document',
-    maxPages = 1,
-    fontSize = 11,
-    fontFamily = 'Helvetica',
-    outputDir = path.join(process.cwd(), 'public', 'outputs')
-  } = options;
-
-  logger.info('Generating PDF', { title, maxPages });
-
-  // Ensure output directory exists
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
+function ensureOutDir() {
+  const out = path.join(process.cwd(), "public", "generated");
+  fs.mkdirSync(out, { recursive: true });
+  
   // Clean up old files (keep last 100)
-  cleanupOldFiles(outputDir, 100);
-
-  return new Promise((resolve, reject) => {
-    try {
-      // Parse JSON content
-      let resumeContent: ResumeContent;
-      try {
-        resumeContent = JSON.parse(content);
-      } catch (e) {
-        logger.warn('Failed to parse JSON, treating as plain text', { error: e });
-        resumeContent = { summary: content };
-      }
-
-      // Create a document
-      const doc = new PDFDocument({
-        size: 'LETTER',
-        margins: { top: 50, bottom: 50, left: 50, right: 50 },
-        bufferPages: true // Enable page buffering for page count check
-      });
-
-      // Generate unique file path
-      const id = uuidv4();
-      const filePath = path.join(outputDir, `${id}.pdf`);
-      const writeStream = fs.createWriteStream(filePath);
-      doc.pipe(writeStream);
-
-      // Buffer to store PDF data
-      const buffers: Buffer[] = [];
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        resolve({ buffer: pdfData, filePath });
-      });
-
-      // Add title
-      doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 4);
-      doc.text(title, { align: 'center' });
-      doc.moveDown(1);
-
-      // Track content that fits
-      let contentFits = true;
-
-      // Add summary
-      if (resumeContent.summary) {
-        doc.font(fontFamily).fontSize(fontSize);
-        doc.text(resumeContent.summary, { align: 'left' });
-        doc.moveDown(1);
-      }
-
-      // Add experience
-      if (resumeContent.experience?.length) {
-        doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
-        doc.text('EXPERIENCE', { align: 'left' });
-        doc.moveDown(0.5);
-
-        for (const exp of resumeContent.experience) {
-          if (doc.bufferedPageRange().count > maxPages) {
-            contentFits = false;
-            break;
-          }
-
-          doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
-          doc.text(exp.company || '', { continued: true });
-          doc.font(fontFamily).fontSize(fontSize);
-          doc.text(` - ${exp.role || ''}`, { align: 'left' });
-
-          if (exp.bullets?.length) {
-            doc.moveDown(0.5);
-            for (const bullet of exp.bullets) {
-              doc.text(`• ${bullet}`, { indent: 15, align: 'left' });
-            }
-          }
-          doc.moveDown(1);
-        }
-      }
-
-      // Add projects
-      if (resumeContent.projects?.length) {
-        if (doc.bufferedPageRange().count <= maxPages) {
-          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
-          doc.text('PROJECTS', { align: 'left' });
-          doc.moveDown(0.5);
-
-          for (const project of resumeContent.projects) {
-            if (doc.bufferedPageRange().count > maxPages) {
-              contentFits = false;
-              break;
-            }
-
-            doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
-            doc.text(project.name || '', { align: 'left' });
-
-            if (project.bullets?.length) {
-              doc.moveDown(0.5);
-              for (const bullet of project.bullets) {
-                doc.text(`• ${bullet}`, { indent: 15, align: 'left' });
-              }
-            }
-            doc.moveDown(1);
-          }
-        }
-      }
-
-      // Add skills
-      if (resumeContent.skills?.length) {
-        if (doc.bufferedPageRange().count <= maxPages) {
-          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
-          doc.text('SKILLS', { align: 'left' });
-          doc.moveDown(0.5);
-
-          doc.font(fontFamily).fontSize(fontSize);
-          doc.text(resumeContent.skills.join(', '), { align: 'left' });
-          doc.moveDown(1);
-        }
-      }
-
-      // Add education
-      if (resumeContent.education?.length) {
-        if (doc.bufferedPageRange().count <= maxPages) {
-          doc.font(`${fontFamily}-Bold`).fontSize(fontSize + 2);
-          doc.text('EDUCATION', { align: 'left' });
-          doc.moveDown(0.5);
-
-          for (const edu of resumeContent.education) {
-            if (doc.bufferedPageRange().count > maxPages) {
-              contentFits = false;
-              break;
-            }
-
-            doc.font(`${fontFamily}-Bold`).fontSize(fontSize);
-            doc.text(edu.school || '', { continued: true });
-            doc.font(fontFamily).fontSize(fontSize);
-            doc.text(` - ${edu.degree || ''} (${edu.year || ''})`, { align: 'left' });
-            doc.moveDown(0.5);
-          }
-        }
-      }
-
-      // If content didn't fit, add a note
-      if (!contentFits) {
-        doc.font(fontFamily).fontSize(8);
-        doc.text('Note: Some content was truncated to fit page limit.', {
-          align: 'center',
-          color: 'gray'
-        });
-      }
-
-      // Add page numbers
-      const pages = doc.bufferedPageRange().count;
-      for (let i = 0; i < pages; i++) {
-        doc.switchToPage(i);
-        
-        // Add page number at bottom
-        doc.font(fontFamily).fontSize(8);
-        doc.text(
-          `Page ${i + 1} of ${pages}`,
-          50,
-          doc.page.height - 50,
-          {
-            align: 'center',
-            width: doc.page.width - 100
-          }
-        );
-      }
-
-      // Finalize the PDF
-      doc.end();
-    } catch (error) {
-      logger.error('Error generating PDF', { error });
-      reject(error);
-    }
-  });
-}
-
-/**
- * Clean up old files in the output directory
- */
-function cleanupOldFiles(directory: string, keepCount: number) {
   try {
-    const files = fs.readdirSync(directory)
+    const files = fs.readdirSync(out)
       .map(file => ({
         name: file,
-        path: path.join(directory, file),
-        mtime: fs.statSync(path.join(directory, file)).mtime
+        path: path.join(out, file),
+        mtime: fs.statSync(path.join(out, file)).mtime
       }))
       .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-    // Delete files beyond the keep count
-    files.slice(keepCount).forEach(file => {
+    files.slice(100).forEach(file => {
       try {
         fs.unlinkSync(file.path);
         logger.info('Cleaned up old file', { file: file.name });
@@ -251,7 +30,134 @@ function cleanupOldFiles(directory: string, keepCount: number) {
         logger.warn('Failed to delete old file', { file: file.name, error: e });
       }
     });
+  } catch (e) {
+    logger.error('Error cleaning up old files', { error: e });
+  }
+
+  return out;
+}
+
+function writeMarkdownPdf(markdown: string, filename: string) {
+  const outDir = ensureOutDir();
+  const full = path.join(outDir, filename);
+
+  logger.info('Writing PDF', { filename });
+
+  try {
+    const doc = new PDFDocument({ 
+      margin: 40,
+      size: 'LETTER',
+      info: {
+        Title: filename.replace('.pdf', ''),
+        CreationDate: new Date()
+      }
+    });
+
+    const stream = fs.createWriteStream(full);
+    doc.pipe(stream);
+
+    // Convert markdown to HTML and strip tags for ATS-friendly text
+    const html = md.render(markdown);
+    const stripped = html
+      .replace(/<[^>]+>/g, "") // strip tags
+      .replace(/\&nbsp;/g, " ")
+      .trim();
+
+    // Process each line
+    stripped.split("\n").forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        doc.moveDown(0.5);
+        return;
+      }
+
+      // Handle headings
+      if (trimmed.match(/^#{1,6}\s/)) {
+        const level = trimmed.match(/^(#{1,6})\s/)?.[1].length || 1;
+        const text = trimmed.replace(/^#{1,6}\s/, '');
+        doc.fontSize(14 - level).font('Helvetica-Bold').text(text);
+        doc.moveDown(0.5);
+        return;
+      }
+
+      // Handle bullet points
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        doc.fontSize(11).font('Helvetica').text(trimmed, { indent: 20 });
+        return;
+      }
+
+      // Regular text
+      doc.fontSize(11).font('Helvetica').text(trimmed, { paragraphGap: 4 });
+    });
+
+    doc.end();
+
+    logger.info('Successfully wrote PDF', { path: full });
+
+    return { 
+      path: full, 
+      url: `/generated/${filename}` 
+    };
   } catch (error) {
-    logger.error('Error cleaning up old files', { error });
+    logger.error('Error writing PDF', { error, filename });
+    throw error;
+  }
+}
+
+export function generateResumeKitPdfs(args: {
+  resume_markdown: string;
+  cover_letter_markdown: string;
+  ats_report: {
+    score: number;
+    matched_keywords: string[];
+    missing_keywords: string[];
+    notes: string[];
+  };
+}) {
+  logger.info('Generating resume kit PDFs');
+
+  try {
+    const id = uuidv4().slice(0, 8);
+
+    // Generate resume PDF
+    const resume = writeMarkdownPdf(args.resume_markdown, `resume-${id}.pdf`);
+
+    // Generate cover letter PDF
+    const cover = writeMarkdownPdf(args.cover_letter_markdown, `cover-letter-${id}.pdf`);
+
+    // Generate ATS report PDF
+    const atsLines: string[] = [];
+    atsLines.push(`# ATS Report`);
+    atsLines.push(`Score: ${Math.round(args.ats_report.score)}/100`);
+    atsLines.push(``);
+    atsLines.push(`## Matched Keywords`);
+    atsLines.push(args.ats_report.matched_keywords.join(", ") || "—");
+    atsLines.push(``);
+    atsLines.push(`## Missing Keywords`);
+    atsLines.push(args.ats_report.missing_keywords.join(", ") || "—");
+    atsLines.push(``);
+    atsLines.push(`## Notes`);
+    if (args.ats_report.notes?.length) {
+      args.ats_report.notes.forEach(n => atsLines.push(`- ${n}`));
+    } else {
+      atsLines.push("—");
+    }
+
+    const ats = writeMarkdownPdf(atsLines.join("\n"), `ats-report-${id}.pdf`);
+
+    logger.info('Successfully generated all PDFs', {
+      resumePath: resume.path,
+      coverPath: cover.path,
+      atsPath: ats.path
+    });
+
+    return {
+      resumePdfUrl: resume.url,
+      coverLetterPdfUrl: cover.url,
+      atsReportPdfUrl: ats.url
+    };
+  } catch (error) {
+    logger.error('Error generating PDFs', { error });
+    throw error;
   }
 }

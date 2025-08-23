@@ -1,83 +1,177 @@
+import { GoogleProvider } from "./providers/google";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { createLogger } from '@/lib/logger';
-import { GoogleProvider } from './providers/google';
-import { OpenAIProvider } from './providers/openai';
-import { AnthropicProvider } from './providers/anthropic';
-import { AIProvider } from './types';
 
-const logger = createLogger('model-router');
+const logger = createLogger('ai-router');
 
-/**
- * Routes requests to the appropriate AI provider based on user selection
- */
-export function modelRouter(provider: string = 'auto', model: string = 'default'): AIProvider {
-  logger.info('Routing to AI provider', { provider, model });
-  
-  // Validate provider
-  const validProvider = validateProvider(provider);
-  
-  // Handle auto-routing
-  if (validProvider === 'auto') {
-    return autoSelectProvider(model);
-  }
-  
-  // Route to specific provider
-  switch (validProvider) {
-    case 'google':
-      return new GoogleProvider(model);
-    case 'openai':
-      return new OpenAIProvider(model);
-    case 'anthropic':
-      return new AnthropicProvider(model);
-    default:
-      logger.warn('Unknown provider, falling back to OpenAI', { provider });
-      return new OpenAIProvider('gpt-4o');
-  }
-}
+export type ProviderChoice = "google" | "openai" | "anthropic" | "auto";
 
-/**
- * Validates and normalizes provider name
- */
-function validateProvider(provider: string): string {
-  const normalized = provider.toLowerCase().trim();
-  
-  // Map provider aliases
-  const providerMap: Record<string, string> = {
-    'auto': 'auto',
-    'google': 'google',
-    'gemini': 'google',
-    'openai': 'openai',
-    'gpt': 'openai',
-    'anthropic': 'anthropic',
-    'claude': 'anthropic',
+export type RouterResult = {
+  resume_markdown: string;
+  cover_letter_markdown: string;
+  ats_report: {
+    score: number;
+    matched_keywords: string[];
+    missing_keywords: string[];
+    notes: string[];
   };
-  
-  return providerMap[normalized] || 'auto';
-}
+  providerUsed: ProviderChoice;
+};
 
-/**
- * Automatically selects the best provider based on the task
- */
-function autoSelectProvider(model: string): AIProvider {
-  // Default to OpenAI for best overall performance
-  if (model === 'default') {
-    logger.info('Auto-selecting OpenAI provider');
-    return new OpenAIProvider('gpt-4o');
-  }
+const withTimeout = <T>(p: Promise<T>, ms = 30000) => {
+  logger.info('Starting operation with timeout', { timeoutMs: ms });
   
-  // If model is specified, try to match to a provider
-  if (model.includes('gpt') || model.includes('openai')) {
-    return new OpenAIProvider(model);
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => {
+      logger.warn('Operation timed out');
+      reject(Object.assign(
+        new Error("PROVIDER_TIMEOUT"), 
+        { code: "PROVIDER_TIMEOUT" }
+      ));
+    }, ms);
+
+    p.then(v => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch(e => {
+      clearTimeout(t);
+      reject(e);
+    });
+  });
+};
+
+export async function generateWithAuto(
+  prompt: string, 
+  preferred: ProviderChoice = "auto"
+): Promise<RouterResult> {
+  const order: ProviderChoice[] =
+    preferred === "auto" 
+      ? ["google", "openai", "anthropic"] 
+      : [preferred, ...["google","openai","anthropic"].filter(p => p !== preferred) as ProviderChoice[]];
+
+  logger.info('Starting generation', { 
+    preferred,
+    providerOrder: order,
+    promptLength: prompt.length
+  });
+
+  const errors: any[] = [];
+
+  for (const p of order) {
+    try {
+      logger.info('Trying provider', { provider: p });
+
+      if (p === "google") {
+        const g = new GoogleProvider("gemini-2.5-pro");
+        const r = await withTimeout(g.generate(prompt));
+        logger.info('Google provider succeeded');
+        return { ...r, providerUsed: "google" };
+      }
+
+      if (p === "openai") {
+        const key = process.env.OPENAI_API_KEY;
+        if (!key) {
+          logger.error('OpenAI API key missing');
+          throw Object.assign(
+            new Error("OPENAI_MISSING_KEY"), 
+            { code: "OPENAI_MISSING_KEY" }
+          );
+        }
+
+        const client = new OpenAI({ apiKey: key });
+        const resp = await withTimeout(
+          client.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          })
+        );
+
+        const content = resp.choices?.[0]?.message?.content ?? "{}";
+        const json = typeof content === "string" ? content : JSON.stringify(content);
+        
+        try {
+          const parsed = JSON.parse(json);
+          logger.info('OpenAI provider succeeded');
+          return { ...parsed, providerUsed: "openai" };
+        } catch (e) {
+          logger.error('Failed to parse OpenAI response', { 
+            error: e,
+            content: content.slice(0, 100) + '...'
+          });
+          throw Object.assign(
+            new Error("OPENAI_JSON_PARSE_ERROR"),
+            { code: "OPENAI_JSON_PARSE_ERROR", raw: content }
+          );
+        }
+      }
+
+      if (p === "anthropic") {
+        const key = process.env.ANTHROPIC_API_KEY;
+        if (!key) {
+          logger.error('Anthropic API key missing');
+          throw Object.assign(
+            new Error("ANTHROPIC_MISSING_KEY"), 
+            { code: "ANTHROPIC_MISSING_KEY" }
+          );
+        }
+
+        const anthropic = new Anthropic({ apiKey: key });
+        const resp = await withTimeout(
+          anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 4000,
+            system: "Return only JSON matching the requested schema.",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3
+          })
+        );
+
+        const content = resp?.content?.[0];
+        const text = content && content.type === "text" ? content.text : "";
+        
+        try {
+          const parsed = JSON.parse(text || "{}");
+          logger.info('Anthropic provider succeeded');
+          return { ...parsed, providerUsed: "anthropic" };
+        } catch (e) {
+          logger.error('Failed to parse Anthropic response', { 
+            error: e,
+            text: text?.slice(0, 100) + '...'
+          });
+          throw Object.assign(
+            new Error("ANTHROPIC_JSON_PARSE_ERROR"),
+            { code: "ANTHROPIC_JSON_PARSE_ERROR", raw: text }
+          );
+        }
+      }
+    } catch (e: any) {
+      logger.error('Provider failed', {
+        provider: p,
+        error: {
+          code: e.code,
+          message: e.message,
+          details: e.details
+        }
+      });
+
+      errors.push({ 
+        provider: p, 
+        code: e?.code || "UNKNOWN", 
+        message: e?.message || String(e) 
+      });
+      continue;
+    }
   }
+
+  const err = new Error("All AI providers failed");
+  Object.assign(err, { 
+    code: "ALL_PROVIDERS_FAILED",
+    details: errors 
+  });
   
-  if (model.includes('gemini') || model.includes('google')) {
-    return new GoogleProvider(model);
-  }
-  
-  if (model.includes('claude') || model.includes('anthropic')) {
-    return new AnthropicProvider(model);
-  }
-  
-  // Default fallback
-  logger.info('No specific provider match, using OpenAI');
-  return new OpenAIProvider('gpt-4o');
+  logger.error('All providers failed', { errors });
+  throw err;
 }
