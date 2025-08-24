@@ -1,5 +1,7 @@
 import "server-only";
 import { debugLogger } from '@/lib/utils/debug-logger';
+import { callWithFallback } from '@/lib/llm/providers/fallback';
+import { safeComposeUserPayload } from '@/lib/extract/prepare-payload';
 import fs from 'fs';
 import path from 'path';
 
@@ -8,6 +10,7 @@ export interface GenerateContentOptions {
   jdText: string;
   jdUrl?: string;
   modelHint?: string;
+  provider?: string;
   profile?: any;
   kitId: string;
 }
@@ -36,6 +39,7 @@ export async function generateContent({
   jdText,
   jdUrl,
   modelHint,
+  provider,
   profile,
   kitId
 }: GenerateContentOptions): Promise<GenerateContentResult> {
@@ -47,9 +51,47 @@ export async function generateContent({
       kitId
     });
 
-    // Generate the content
-    const resumeHtml = generateResumeHtml(profile || {}, jdText);
-    const coverHtml = generateCoverLetterHtml(profile || {}, jdText);
+    // Try LLM path first (guarded); fallback to mock
+    let resumeHtml: string | null = null;
+    let coverHtml: string | null = null;
+
+    try {
+      const schemaJson = { 
+        version: 1,
+        fields: ["header","summary","skills","experience","projects","education"]
+      };
+      const system = SYSTEM_RECRUITER + "\nReturn either valid JSON strictly matching the schema fields or plain text if unable.";
+      const userPayload = safeComposeUserPayload(schemaJson, resumeOriginalText, jdText);
+      const providerLabel = (provider as any) || 'Google';
+      const modelLabel = modelHint || 'Gemini 2.5 Pro';
+
+      const llm = await callWithFallback({ provider: providerLabel as any, modelLabel, system, userPayload, maxOutputTokens: 2000 });
+      if ((llm as any).ok) {
+        const text = (llm as any).text as string;
+        try {
+          const parsed = JSON.parse(text);
+          resumeHtml = generateResumeHtml(parsed || profile || {}, jdText);
+          coverHtml = generateCoverLetterHtml(parsed || profile || {}, jdText);
+          debugLogger.info('LLM content used', { kitId, providerUsed: (llm as any).provider });
+        } catch {
+          // Treat as freeform text; wrap minimally
+          const pseudo = { ...profile, summary: text.slice(0, 1500) };
+          resumeHtml = generateResumeHtml(pseudo, jdText);
+          coverHtml = generateCoverLetterHtml(pseudo, jdText);
+          debugLogger.warn('LLM returned non-JSON; used fallback wrapping', { kitId });
+        }
+      } else {
+        debugLogger.warn('LLM fallback path activated', { kitId, errors: (llm as any).errors });
+      }
+    } catch (e) {
+      debugLogger.error('LLM content generation failed', { kitId, error: e instanceof Error ? e.message : String(e) });
+    }
+
+    // Ensure we have content
+    if (!resumeHtml || !coverHtml) {
+      resumeHtml = generateResumeHtml(profile || {}, jdText);
+      coverHtml = generateCoverLetterHtml(profile || {}, jdText);
+    }
     
     // Save the files
     const publicDir = path.join(process.cwd(), 'public');

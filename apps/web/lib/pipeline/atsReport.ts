@@ -1,6 +1,7 @@
 import { debugLogger } from '@/lib/utils/debug-logger';
 import fs from 'fs';
 import path from 'path';
+import { scoreAts } from './ats/score';
 
 interface ATSReportInput {
   resumeText: string;
@@ -73,27 +74,28 @@ function generateATSReport(resumeText: string, jdText: string) {
   const resumeKeywords = extractKeywords(resumeText);
   const matches = jdKeywords.filter(k => resumeKeywords.includes(k));
   
-  // Calculate base score from keyword matches
-  const keywordScore = Math.round((matches.length / jdKeywords.length) * 100);
+  // Use the improved scoring algorithm
+  const atsScore = scoreAts(resumeText, jdText);
+  const score = atsScore.matchPercent;
   
-  // Add some variance but keep within 60-95 range
-  const score = Math.min(95, Math.max(60, keywordScore));
+  // Calculate basic keyword match percentage for section scores
+  const basicMatchPercent = Math.round((matches.length / Math.max(1, jdKeywords.length)) * 100);
   
   // Generate section scores with some randomness but influenced by keyword score
   const sections = [
     {
       section: "Skills Match",
-      score: Math.min(95, Math.max(60, keywordScore + (Math.random() * 10 - 5))),
+      score: Math.min(95, Math.max(60, basicMatchPercent + (Math.random() * 10 - 5))),
       feedback: generateSkillsFeedback(matches, jdKeywords)
     },
     {
       section: "Experience Relevance",
-      score: Math.min(95, Math.max(60, keywordScore + (Math.random() * 10 - 5))),
+      score: Math.min(95, Math.max(60, basicMatchPercent + (Math.random() * 10 - 5))),
       feedback: "Consider quantifying achievements and highlighting specific experiences relevant to the role."
     },
     {
       section: "Keyword Optimization",
-      score: keywordScore,
+      score: basicMatchPercent,
       feedback: generateKeywordFeedback(matches, jdKeywords)
     },
     {

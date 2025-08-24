@@ -3,15 +3,18 @@ import { debugLogger } from './utils/debug-logger';
 import type { User, ResumeKit, MockDb } from '@/types/db';
 
 declare global {
+  // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
+  // eslint-disable-next-line no-var
+  var __mockDb: MockDb | undefined;
 }
 
 // Determine if DB should be used
 const hasValidDatabaseUrl = typeof process.env.DATABASE_URL === 'string' && /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL);
 const isDbEnabled = process.env.SKIP_DB !== '1' && hasValidDatabaseUrl;
 
-// Mock database for development
-const mockDb: MockDb = {
+// Mock database for development (persist across HMR via global)
+const mockDb: MockDb = global.__mockDb || {
   users: [
     {
       id: 'mock-user',
@@ -23,6 +26,7 @@ const mockDb: MockDb = {
   ],
   resumeKits: []
 };
+global.__mockDb = mockDb;
 
 // Initialize Prisma Client only when DB is enabled
 export const prisma = isDbEnabled
@@ -44,7 +48,7 @@ export const getMockResumeKit = (id: string): ResumeKit | undefined => {
 
 export const createMockResumeKit = (data: Partial<ResumeKit>): ResumeKit => {
   const kit: ResumeKit = {
-    id: `mock-${Date.now()}`,
+    id: data.id || `mock-${Date.now()}`,
     userId: data.userId!,
     status: data.status || 'pending',
     originalResume: data.originalResume || '',

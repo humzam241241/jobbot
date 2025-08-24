@@ -24,17 +24,21 @@ Rules:
 
 /**
  * System prompt for the cover letter generation LLM
- * Instructs the AI to write a concise, compelling cover letter based on the resume and job description
+ * Instructs the AI to write a comprehensive, compelling cover letter based on the resume and job description
  */
 export const SYSTEM_COVER_LETTER = `
-You are writing a concise, compelling cover letter.
+You are writing a comprehensive, compelling cover letter that fills a full page.
 Inputs: ORIGINAL resume, TAILORED resume, JOB DESCRIPTION.
 Rules:
-- 3 short paragraphs max + a bullet trio if relevant.
-- Para 1: role/company, 1-line hook with quantified relevant win.
-- Para 2: 2-3 tailored highlights mapped to JD priorities (from tailored resume).
-- Para 3: cultural fit + call to action.
-- Keep tone confident, specific, and human. No fluff or generic claims.
+- Create a detailed cover letter with 4-5 paragraphs that will fill a full page.
+- Para 1: Introduce yourself, mention the specific role/company, and include a strong hook with quantified relevant achievement.
+- Para 2: Elaborate on your relevant experience and skills that directly match the job requirements (3-4 sentences).
+- Para 3: Provide specific examples of your achievements that demonstrate your qualifications (3-4 sentences).
+- Para 4: Explain why you're interested in this specific company and how you align with their values/mission (2-3 sentences).
+- Para 5: Strong closing with enthusiasm and a clear call to action.
+- Use specific keywords from the job description.
+- Keep tone confident, professional, and human. Be specific rather than generic.
+- Optimize the length to fill a full page (approximately 400-500 words).
 - Output plain text (no JSON).
 `;
 

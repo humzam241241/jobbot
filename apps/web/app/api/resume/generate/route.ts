@@ -17,8 +17,8 @@ import { renderWithStylePreserve } from '@/lib/generation/style-preserve';
 const hasValidDatabaseUrl = typeof process.env.DATABASE_URL === 'string' && /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '');
 const isDbEnabled = process.env.SKIP_DB !== '1' && !!hasValidDatabaseUrl && !!prisma;
 
-// Style preservation enabled?
-const isStylePreservationEnabled = process.env.STYLE_PRESERVE === '1';
+// Style preservation enabled by default
+const isStylePreservationEnabled = process.env.STYLE_PRESERVE !== '0';
 
 // Create logs directory if it doesn't exist
 const LOG_DIR = path.join(process.cwd(), 'logs');
@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
         jdText: jobDescription,
         jdUrl: jobUrl,
         modelHint: model,
+        provider,
         profile,
         kitId: kit.id
       });
@@ -223,7 +224,13 @@ export async function POST(request: NextRequest) {
             originalResumePath,
             profile,
             jobDescription,
-            { score: atsScore, keywords: [], matched: [], coverage: atsScore / 100 }
+            { 
+              matchPercent: atsScore, 
+              keywordsCovered: [], 
+              keywordsMissing: [], 
+              warnings: [],
+              recommendations: []
+            }
           );
           
           updateData = {

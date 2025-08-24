@@ -12,9 +12,24 @@ const isDbEnabled = process.env.SKIP_DB !== '1' && !!hasValidDatabaseUrl && !!pr
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { kitId: string } }
+  ctx?: { params?: { kitId: string } }
 ) {
-  const { kitId } = params;
+  // Be defensive: Next should pass params, but some wrappers may omit it
+  let kitId = ctx?.params?.kitId;
+  if (!kitId) {
+    try {
+      const path = request.nextUrl.pathname; // /api/resume-kit/{kitId}
+      const parts = path.split('/').filter(Boolean);
+      const idx = parts.findIndex(p => p === 'resume-kit');
+      if (idx !== -1 && parts[idx + 1]) kitId = parts[idx + 1];
+    } catch {}
+  }
+  if (!kitId) {
+    return NextResponse.json(
+      { success: false, error: { message: 'Missing kitId' } },
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   
   try {
     debugLogger.debug('Fetching resume kit', { component: 'API:resume-kit/[kitId]', kitId });

@@ -10,6 +10,18 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
+  // Handle login page - check if user is already authenticated
+  if (pathname === '/login') {
+    // Get the session token from the cookie
+    const sessionToken = req.cookies.get('next-auth.session-token')?.value || 
+                        req.cookies.get('__Secure-next-auth.session-token')?.value;
+    
+    // If user has a session token, redirect to dashboard
+    if (sessionToken) {
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+  }
+
   // Protected routes that require authentication
   const protectedRoutes = ['/dashboard', '/jobbot', '/results', '/applications', '/library', '/settings'];
   
@@ -37,6 +49,7 @@ export default async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     '/',
+    '/login',
     '/dashboard/:path*',
     '/jobbot/:path*',
     '/results/:path*',
