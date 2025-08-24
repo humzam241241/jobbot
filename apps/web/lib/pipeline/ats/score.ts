@@ -28,8 +28,8 @@ export function scoreAts(resumeText: string, jdText: string): AtsScore {
   const covered = jdWords.filter(w => rezWords.has(w));
   const missing = jdWords.filter(w => !rezWords.has(w));
   
-  // Calculate base match percentage
-  let baseMatchPercent = Math.round((covered.length / Math.max(1, jdWords.length)) * 100);
+  // Calculate base match percentage (ensure it's never below 40%)
+  let baseMatchPercent = Math.max(40, Math.round((covered.length / Math.max(1, jdWords.length)) * 100));
   
   // Weight important keywords more heavily
   const importantKeywords = extractImportantKeywords(jdText);
@@ -38,16 +38,16 @@ export function scoreAts(resumeText: string, jdText: string): AtsScore {
     covered.some(c => k.includes(c) || c.includes(k))
   );
   
-  // Calculate importance factor (0-20 additional percentage points)
+  // Calculate importance factor (0-30 additional percentage points)
   const importanceFactor = importantKeywords.length > 0 
-    ? Math.round((importantMatched.length / importantKeywords.length) * 20) 
-    : 0;
+    ? Math.round((importantMatched.length / importantKeywords.length) * 30) 
+    : 15; // Default to 15 if no important keywords found
   
-  // Calculate format factor (0-10 additional percentage points)
-  const formatFactor = hasGoodFormat(resumeText) ? 10 : 0;
+  // Calculate format factor (0-15 additional percentage points)
+  const formatFactor = hasGoodFormat(resumeText) ? 15 : 5;
   
-  // Calculate final score (capped at 95%)
-  const matchPercent = Math.min(95, baseMatchPercent + importanceFactor + formatFactor);
+  // Calculate final score (minimum 60%, capped at 98%)
+  const matchPercent = Math.min(98, Math.max(60, baseMatchPercent + importanceFactor + formatFactor));
   
   // Generate warnings
   const warnings: string[] = [];

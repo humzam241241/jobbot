@@ -87,48 +87,59 @@ export async function GET(
       );
     }
 
-    // Check if files exist for completed kits
-    if (kit.status === 'completed') {
-      const publicDir = path.join(process.cwd(), 'public');
-      const resumePath = path.join(publicDir, kit.tailoredResume?.replace(/^\//, '') || '');
-      const coverLetterPath = path.join(publicDir, kit.coverLetter?.replace(/^\//, '') || '');
-      const atsReportPath = path.join(publicDir, kit.atsReport?.replace(/^\//, '') || '');
-
-      const filesExist = [resumePath, coverLetterPath, atsReportPath].every(filePath => {
-        try {
-          return fs.existsSync(filePath);
-        } catch (error) {
-          debugLogger.error('Error checking file existence', { 
-            component: 'API:resume-kit/[kitId]', 
-            filePath, 
-            error 
-          });
-          return false;
-        }
-      });
-
-      if (!filesExist) {
-        debugLogger.warn('Files missing for completed kit', { 
+          // Check if files exist for completed kits
+      if (kit.status === 'completed') {
+        const publicDir = path.join(process.cwd(), 'public');
+        
+        // Check which files exist
+        const resumePath = kit.tailoredResume ? path.join(publicDir, kit.tailoredResume.replace(/^\//, '')) : null;
+        const coverLetterPath = kit.coverLetter ? path.join(publicDir, kit.coverLetter.replace(/^\//, '')) : null;
+        const atsReportPath = kit.atsReport ? path.join(publicDir, kit.atsReport.replace(/^\//, '')) : null;
+        
+        // Track which files exist
+        const hasResume = resumePath ? fs.existsSync(resumePath) : false;
+        const hasCoverLetter = coverLetterPath ? fs.existsSync(coverLetterPath) : false;
+        const hasAtsReport = atsReportPath ? fs.existsSync(atsReportPath) : false;
+        
+        // Log file existence
+        debugLogger.info('Checking files for kit', { 
           component: 'API:resume-kit/[kitId]', 
           kitId,
+          hasResume,
+          hasCoverLetter,
+          hasAtsReport,
           resumePath,
           coverLetterPath,
           atsReportPath
         });
-        // Update status to failed if files are missing
-        if (isDbEnabled) {
-          await (prisma as any)!.resumeKit.update({
-            where: { id: kitId },
-            data: { 
-              status: 'failed',
-              error: 'Generated files are missing'
-            }
+        
+        // Add file existence info to kit
+        kit.hasResume = hasResume;
+        kit.hasCoverLetter = hasCoverLetter;
+        kit.hasAtsReport = hasAtsReport;
+        
+        // Only mark as failed if the resume is missing (the most important file)
+        if (!hasResume) {
+          debugLogger.warn('Resume file missing for completed kit', { 
+            component: 'API:resume-kit/[kitId]', 
+            kitId,
+            resumePath
           });
+          
+          // Update status to failed if resume is missing
+          if (isDbEnabled) {
+            await (prisma as any)!.resumeKit.update({
+              where: { id: kitId },
+              data: { 
+                status: 'failed',
+                error: 'Generated files are missing'
+              }
+            });
+          }
+          kit.status = 'failed';
+          kit.error = 'Generated files are missing';
         }
-        kit.status = 'failed';
-        kit.error = 'Generated files are missing';
       }
-    }
 
     // Return kit data
     return NextResponse.json(
