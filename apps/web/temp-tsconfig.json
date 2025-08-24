@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "lib/pdf/**/*.ts",
+    "lib/pdf/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests",
+    ".next"
+  ]
+}

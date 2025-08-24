@@ -27,3 +27,4 @@ export function atsHtml(score: AtsScore, candidateName?: string) {
   <h2>Recommendations</h2>
   <ul>${score.recommendations.map(r => `<li>${r}</li>`).join("")}</ul>
 </body></html>`;
+}

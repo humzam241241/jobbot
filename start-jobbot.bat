@@ -54,6 +54,10 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING
     taskkill /F /PID %%a >nul 2>nul
 )
 
+REM Clear auth cookies from browser
+echo Clearing authentication cookies...
+powershell -Command "Start-Process 'chrome' -ArgumentList '--user-data-dir=\"%LOCALAPPDATA%\Google\Chrome\User Data\"', '--profile-directory=Default', '-incognito', 'about:blank' -PassThru | ForEach-Object { Start-Sleep -Seconds 1; $_.Kill() }"
+
 REM Install dependencies
 echo Installing dependencies...
 call %PM% install
@@ -83,14 +87,15 @@ if !ERRORLEVEL! NEQ 0 (
 REM Set environment variables
 set "NEXT_TELEMETRY_DISABLED=1"
 set "NODE_OPTIONS=--max-old-space-size=4096"
+set "FORCE_LOGOUT=1"
 
 echo.
 echo Starting development server...
 echo ===========================
 echo.
 
-REM Start browser after a delay
-start "" cmd /c "timeout /t 5 /nobreak >nul && start http://localhost:3000/jobbot"
+REM Start browser after a delay to the login page
+start "" cmd /c "timeout /t 5 /nobreak >nul && start http://localhost:3000/login"
 
 REM Start development server
 call %PM% run dev

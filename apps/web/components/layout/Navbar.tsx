@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { Logo } from '@/components/ui/Logo';
 import { toast } from 'react-hot-toast';
@@ -28,13 +28,35 @@ interface NavbarProps {
 
 export function Navbar({ credits = 0, maxCredits = 10 }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignOut = async () => {
     try {
       setIsLoading(true);
-      await signOut({ redirect: true, callbackUrl: '/login' });
+      
+      // Clear all auth-related cookies and local storage
+      localStorage.removeItem('next-auth.session-token');
+      localStorage.removeItem('next-auth.callback-url');
+      localStorage.removeItem('next-auth.csrf-token');
+      document.cookie.split(';').forEach(c => {
+        document.cookie = c
+          .replace(/^ +/, '')
+          .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+      });
+      
+      // Sign out and redirect to login page
+      await signOut({ 
+        redirect: false 
+      });
+      
+      // Force redirect to login page
+      router.push('/login');
+      router.refresh();
+      
+      toast.success('Signed out successfully');
     } catch (error) {
+      console.error('Sign out error:', error);
       toast.error('Failed to sign out');
     } finally {
       setIsLoading(false);

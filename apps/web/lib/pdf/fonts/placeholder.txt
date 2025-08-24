@@ -1,0 +1,6 @@
+This directory is for font files used by the PDF rendering pipeline.
+Required fonts:
+- Inter-Regular.ttf
+- Inter-Bold.ttf
+
+If these files are missing, the renderer will fall back to standard fonts.
