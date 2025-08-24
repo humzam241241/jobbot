@@ -77,7 +77,46 @@ export function useResumeGeneration() {
       addDebugLog('API request initiated');
       const startTime = performance.now();
       
-      const result = await apiUpload<{ id: string; status: string }>('/api/resume/generate', formData);
+      // Use fetch directly for better control over headers and response handling
+      const response = await fetch('/api/resume/generate', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const contentType = response.headers.get('Content-Type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new ApiError(
+            errorData.error?.message || `Error: ${response.status} ${response.statusText}`,
+            response.status,
+            errorData.error?.code
+          );
+        } else {
+          throw new ApiError(`Error: ${response.status} ${response.statusText}`, response.status);
+        }
+      }
+      
+      const contentType = response.headers.get('Content-Type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new ApiError('Invalid response format: Expected JSON', response.status);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new ApiError(
+          data.error?.message || 'Generation failed',
+          response.status,
+          data.error?.code
+        );
+      }
+      
+      const result = data.data;
       
       const endTime = performance.now();
       addDebugLog('API request completed', { 
@@ -101,10 +140,23 @@ export function useResumeGeneration() {
           });
           
           if (!response.ok) {
-            throw new ApiError(
-              `Error polling status: ${response.status} ${response.statusText}`,
-              response.status
-            );
+            const contentType = response.headers.get('Content-Type');
+            
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              throw new ApiError(
+                errorData.error?.message || `Error polling status: ${response.status} ${response.statusText}`,
+                response.status,
+                errorData.error?.code
+              );
+            } else {
+              throw new ApiError(`Error polling status: ${response.status} ${response.statusText}`, response.status);
+            }
+          }
+          
+          const contentType = response.headers.get('Content-Type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new ApiError('Invalid response format: Expected JSON', response.status);
           }
           
           const data = await response.json();

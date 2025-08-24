@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ResumeKit } from '@/types';
 import Link from 'next/link';
-import { ArrowLeft, Download, FileText, Mail, BarChart } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Mail, BarChart, AlertCircle } from 'lucide-react';
 
 export default function ResultPage() {
   const { kitId } = useParams();
@@ -22,8 +22,22 @@ export default function ResultPage() {
       })
         .then(response => {
           if (!response.ok) {
-            throw new Error(`Error fetching resume kit: ${response.status} ${response.statusText}`);
+            const contentType = response.headers.get('Content-Type');
+            
+            if (contentType && contentType.includes('application/json')) {
+              return response.json().then(data => {
+                throw new Error(data.error?.message || `Error: ${response.status} ${response.statusText}`);
+              });
+            } else {
+              throw new Error(`Error fetching resume kit: ${response.status} ${response.statusText}`);
+            }
           }
+          
+          const contentType = response.headers.get('Content-Type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Invalid response format: Expected JSON');
+          }
+          
           return response.json();
         })
         .then(data => {
@@ -44,8 +58,12 @@ export default function ResultPage() {
   if (error) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg mb-4">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg mb-4 flex items-start">
+          <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-medium text-red-800 dark:text-red-300">Error</h3>
+            <p className="text-red-600 dark:text-red-400 mt-1">{error}</p>
+          </div>
         </div>
         <Link 
           href="/jobbot" 
@@ -89,10 +107,14 @@ export default function ResultPage() {
       </div>
       
       {kit.status === 'failed' && (
-        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg mb-6">
-          <p className="text-red-600 dark:text-red-400">
-            Generation failed: {kit.error || 'Unknown error'}
-          </p>
+        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg mb-6 flex items-start">
+          <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-medium text-red-800 dark:text-red-300">Generation Failed</h3>
+            <p className="text-red-600 dark:text-red-400 mt-1">
+              {kit.error || 'An unknown error occurred during generation.'}
+            </p>
+          </div>
         </div>
       )}
       
@@ -105,15 +127,25 @@ export default function ResultPage() {
           </div>
           
           {kit.tailoredResume ? (
-            <a
-              href={kit.tailoredResume}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full px-4 py-2 mt-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Resume PDF
-            </a>
+            <div className="flex flex-col space-y-2">
+              <a
+                href={kit.tailoredResume}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                View Resume PDF
+              </a>
+              <a
+                href={`/api/kits/${kitId}/download?file=resume`}
+                download
+                className="flex items-center justify-center w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Resume
+              </a>
+            </div>
           ) : (
             <p className="text-gray-500 dark:text-gray-400">
               Resume not available
@@ -129,15 +161,25 @@ export default function ResultPage() {
           </div>
           
           {kit.coverLetter ? (
-            <a
-              href={kit.coverLetter}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full px-4 py-2 mt-4 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Cover Letter PDF
-            </a>
+            <div className="flex flex-col space-y-2">
+              <a
+                href={kit.coverLetter}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                View Cover Letter PDF
+              </a>
+              <a
+                href={`/api/kits/${kitId}/download?file=cover`}
+                download
+                className="flex items-center justify-center w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Cover Letter
+              </a>
+            </div>
           ) : (
             <p className="text-gray-500 dark:text-gray-400">
               Cover letter not available
@@ -153,15 +195,25 @@ export default function ResultPage() {
           </div>
           
           {kit.atsReport ? (
-            <a
-              href={kit.atsReport}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full px-4 py-2 mt-4 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              View ATS Report
-            </a>
+            <div className="flex flex-col space-y-2">
+              <a
+                href={kit.atsReport}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                View ATS Report
+              </a>
+              <a
+                href={`/api/kits/${kitId}/download?file=ats`}
+                download
+                className="flex items-center justify-center w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download ATS Report
+              </a>
+            </div>
           ) : (
             <p className="text-gray-500 dark:text-gray-400">
               ATS report not available

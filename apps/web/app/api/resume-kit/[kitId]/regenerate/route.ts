@@ -21,7 +21,13 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       debugLogger.debug('Authentication failed', { component: 'API:resume-kit/[kitId]/regenerate', session });
-      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { 
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Get resume kit
@@ -38,7 +44,13 @@ export async function POST(
 
     if (!kit) {
       debugLogger.debug('Resume kit not found', { component: 'API:resume-kit/[kitId]/regenerate', kitId });
-      return NextResponse.json({ success: false, error: { message: 'Resume kit not found' } }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Resume kit not found' } },
+        { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Check if user has access to this kit
@@ -49,7 +61,13 @@ export async function POST(
         userId: (session.user as any).id, 
         kitUserId: kit.userId 
       });
-      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { 
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Check user credits
@@ -71,7 +89,10 @@ export async function POST(
       });
       return NextResponse.json(
         { success: false, error: { message: 'Insufficient credits' } },
-        { status: 402 }
+        { 
+          status: 402,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
 
@@ -93,13 +114,16 @@ export async function POST(
 
     // In a real implementation, we would trigger the generation process here
     // For now, just return success
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: kitId,
-        status: 'pending'
-      }
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          id: kitId,
+          status: 'pending'
+        }
+      },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     debugLogger.error('Error regenerating resume kit', { 
       component: 'API:resume-kit/[kitId]/regenerate', 
@@ -110,7 +134,10 @@ export async function POST(
     
     return NextResponse.json(
       { success: false, error: { message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' } },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 }
@@ -120,6 +147,7 @@ export const OPTIONS = async () => {
   return new NextResponse(null, {
     status: 204,
     headers: {
+      'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',

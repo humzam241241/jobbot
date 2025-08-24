@@ -14,18 +14,27 @@ class ApiError extends Error {
 async function handleResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type');
   
-  if (!contentType?.includes('application/json')) {
-    throw new ApiError('Invalid response format', response.status);
+  if (!contentType || !contentType.includes('application/json')) {
+    throw new ApiError(`Invalid response format: Expected JSON but got ${contentType || 'unknown'}`, response.status);
   }
 
-  const data: ApiResponse<T> = await response.json();
+  let data: ApiResponse<T>;
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new ApiError(`Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`, response.status);
+  }
   
   if (!response.ok || !data.success) {
     throw new ApiError(
-      data.error?.message || 'An unexpected error occurred',
+      data.error?.message || `Error: ${response.status} ${response.statusText || 'Unknown error'}`,
       response.status,
       data.error?.code
     );
+  }
+
+  if (data.data === undefined) {
+    throw new ApiError('Invalid response format: Missing data property', response.status);
   }
 
   return data.data as T;
@@ -34,7 +43,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export async function apiGet<T>(endpoint: string): Promise<T> {
   const response = await fetch(endpoint, {
     headers: {
-      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
   });
   return handleResponse<T>(response);
@@ -45,6 +54,7 @@ export async function apiPost<T>(endpoint: string, data?: any): Promise<T> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
     body: data ? JSON.stringify(data) : undefined,
   });
@@ -54,6 +64,9 @@ export async function apiPost<T>(endpoint: string, data?: any): Promise<T> {
 export async function apiUpload<T>(endpoint: string, formData: FormData): Promise<T> {
   const response = await fetch(endpoint, {
     method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+    },
     body: formData,
   });
   return handleResponse<T>(response);

@@ -22,3 +22,7 @@ apps/web/playwright-report/
 apps/web/test-results/
 apps/web/prisma/dev.db
 resume-bot/apps/.expo/
+
+# Proprietary font drop-ins (if user adds locally)
+apps/web/public/fonts/Proprietary-*.ttf
+apps/web/public/fonts/Proprietary-*.otf

@@ -11,10 +11,14 @@ import { createAtsReport } from '@/lib/pipeline/atsReport';
 import { extractProfile } from '@/lib/extractors/extractProfile';
 import puppeteer from 'puppeteer';
 import type { ResumeKit } from '@/lib/types/resumeKit';
+import { renderWithStylePreserve } from '@/lib/generation/style-preserve';
 
 // Helper: DB enabled?
 const hasValidDatabaseUrl = typeof process.env.DATABASE_URL === 'string' && /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '');
 const isDbEnabled = process.env.SKIP_DB !== '1' && !!hasValidDatabaseUrl && !!prisma;
+
+// Style preservation enabled?
+const isStylePreservationEnabled = process.env.STYLE_PRESERVE === '1';
 
 // Create logs directory if it doesn't exist
 const LOG_DIR = path.join(process.cwd(), 'logs');
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    log('Request received', { requestId });
+    log('Request received', { requestId, stylePreservation: isStylePreservationEnabled });
     
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -175,6 +179,10 @@ export async function POST(request: NextRequest) {
       // Convert resume to buffer
       const resumeBuffer = Buffer.from(await resume.arrayBuffer());
       
+      // Save original resume for style analysis
+      const originalResumePath = path.join(kitDir, 'original.pdf');
+      fs.writeFileSync(originalResumePath, resumeBuffer);
+      
       // Extract profile from resume
       log('Extracting profile');
       const profile: any = await extractProfile(resumeBuffer, resume.type);
@@ -202,39 +210,93 @@ export async function POST(request: NextRequest) {
       });
       log('ATS report generated', { atsScore });
 
-      // Save artifacts
-      const resumePath = path.join(kitDir, 'resume.pdf');
-      const coverPath = path.join(kitDir, 'cover-letter.pdf');
-      const atsPath = path.join(kitDir, 'ats.html');
+      // Determine rendering method
+      let updateData: Partial<ResumeKit>;
+      
+      if (isStylePreservationEnabled) {
+        try {
+          log('Using style-preserving rendering');
+          
+          // Try style-preserving rendering
+          const result = await renderWithStylePreserve(
+            kit.id,
+            originalResumePath,
+            profile,
+            jobDescription,
+            { score: atsScore, keywords: [], matched: [], coverage: atsScore / 100 }
+          );
+          
+          updateData = {
+            status: 'completed',
+            tailoredResume: result.resumeUrl,
+            coverLetter: result.coverLetterUrl,
+            atsReport: result.atsReportUrl,
+            updatedAt: new Date()
+          };
+          
+          log('Style-preserving rendering successful', { result });
+        } catch (styleError) {
+          // Fall back to standard rendering
+          log('Style-preserving rendering failed, falling back to standard rendering', { error: styleError });
+          
+          // Save artifacts
+          const resumePath = path.join(kitDir, 'resume.pdf');
+          const coverPath = path.join(kitDir, 'cover-letter.pdf');
+          const atsPath = path.join(kitDir, 'ats.html');
 
-      // Convert HTML to PDF
-      log('Converting resume to PDF');
-      await htmlToPdf(resumeHtml, resumePath);
-      log('Converting cover letter to PDF');
-      await htmlToPdf(coverHtml, coverPath);
-      log('Saving ATS report');
-      fs.writeFileSync(atsPath, reportHtml);
+          // Convert HTML to PDF
+          log('Converting resume to PDF');
+          await htmlToPdf(resumeHtml, resumePath);
+          log('Converting cover letter to PDF');
+          await htmlToPdf(coverHtml, coverPath);
+          log('Saving ATS report');
+          fs.writeFileSync(atsPath, reportHtml);
+          
+          updateData = {
+            status: 'completed',
+            tailoredResume: `/kits/${kitId}/resume.pdf`,
+            coverLetter: `/kits/${kitId}/cover-letter.pdf`,
+            atsReport: `/kits/${kitId}/ats.html`,
+            updatedAt: new Date()
+          };
+        }
+      } else {
+        // Standard rendering
+        log('Using standard rendering');
+        
+        // Save artifacts
+        const resumePath = path.join(kitDir, 'resume.pdf');
+        const coverPath = path.join(kitDir, 'cover-letter.pdf');
+        const atsPath = path.join(kitDir, 'ats.html');
+
+        // Convert HTML to PDF
+        log('Converting resume to PDF');
+        await htmlToPdf(resumeHtml, resumePath);
+        log('Converting cover letter to PDF');
+        await htmlToPdf(coverHtml, coverPath);
+        log('Saving ATS report');
+        fs.writeFileSync(atsPath, reportHtml);
+        
+        updateData = {
+          status: 'completed',
+          tailoredResume: `/kits/${kitId}/resume.pdf`,
+          coverLetter: `/kits/${kitId}/cover-letter.pdf`,
+          atsReport: `/kits/${kitId}/ats.html`,
+          updatedAt: new Date()
+        };
+      }
 
       // Verify files exist and have content
       const fileStats = await Promise.all([
-        fs.promises.stat(resumePath),
-        fs.promises.stat(coverPath),
-        fs.promises.stat(atsPath)
+        fs.promises.stat(path.join(process.cwd(), 'public', updateData.tailoredResume!.replace(/^\//, ''))),
+        fs.promises.stat(path.join(process.cwd(), 'public', updateData.coverLetter!.replace(/^\//, ''))),
+        fs.promises.stat(path.join(process.cwd(), 'public', updateData.atsReport!.replace(/^\//, '')))
       ]);
 
       const allFilesValid = fileStats.every(stat => stat.size > 0);
       if (!allFilesValid) {
         throw new Error('Generated files validation failed');
       }
-
-      // Update kit with results
-      const updateData: Partial<ResumeKit> = {
-        status: 'completed',
-        tailoredResume: `/kits/${kitId}/resume.pdf`,
-        coverLetter: `/kits/${kitId}/cover-letter.pdf`,
-        atsReport: `/kits/${kitId}/ats.html`,
-        updatedAt: new Date()
-      };
 
       if (isDbEnabled) {
         // Use transaction to update kit and decrement credits atomically

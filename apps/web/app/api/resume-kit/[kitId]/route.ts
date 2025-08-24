@@ -23,7 +23,13 @@ export async function GET(
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       debugLogger.debug('Authentication failed', { component: 'API:resume-kit/[kitId]', session });
-      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { 
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Get resume kit
@@ -40,7 +46,13 @@ export async function GET(
 
     if (!kit) {
       debugLogger.debug('Resume kit not found', { component: 'API:resume-kit/[kitId]', kitId });
-      return NextResponse.json({ success: false, error: { message: 'Resume kit not found' } }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Resume kit not found' } },
+        { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Check if user has access to this kit
@@ -51,7 +63,13 @@ export async function GET(
         userId: (session.user as any).id, 
         kitUserId: kit.userId 
       });
-      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { 
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Check if files exist for completed kits
@@ -98,10 +116,10 @@ export async function GET(
     }
 
     // Return kit data
-    return NextResponse.json({
-      success: true,
-      data: kit
-    });
+    return NextResponse.json(
+      { success: true, data: kit },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     debugLogger.error('Error fetching resume kit', { 
       component: 'API:resume-kit/[kitId]', 
@@ -112,7 +130,10 @@ export async function GET(
     
     return NextResponse.json(
       { success: false, error: { message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' } },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 }
@@ -122,7 +143,10 @@ export async function HEAD(
   request: NextRequest,
   { params }: { params: { kitId: string } }
 ) {
-  return new NextResponse(null, { status: 200 });
+  return new NextResponse(null, { 
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 // Set CORS headers
@@ -130,6 +154,7 @@ export const OPTIONS = async () => {
   return new NextResponse(null, {
     status: 204,
     headers: {
+      'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
