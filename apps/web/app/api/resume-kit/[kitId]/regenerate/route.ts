@@ -1,176 +1,128 @@
-import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
-import { formatPreservingResume } from "@/lib/pdf/formatPreserving";
-import { generateResumeKitPdfs } from "@/lib/pdf/generate";
-import { getUserUsage } from "@/lib/usage/counter";
-import { createLogger } from '@/lib/logger';
-import { withErrorHandler, jsonResponse } from "@/app/api/error-handler";
-import fs from "fs";
-import path from "path";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma, getMockResumeKit, updateMockResumeKit } from '@/lib/db';
+import { debugLogger } from '@/lib/utils/debug-logger';
 
-const logger = createLogger('resume-kit-regenerate');
+// Helper: DB enabled?
+const hasValidDatabaseUrl = typeof process.env.DATABASE_URL === 'string' && /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '');
+const isDbEnabled = process.env.SKIP_DB !== '1' && !!hasValidDatabaseUrl && !!prisma;
 
-export const POST = withErrorHandler(async (
-  req: NextRequest,
+export async function POST(
+  request: NextRequest,
   { params }: { params: { kitId: string } }
-) => {
+) {
   const { kitId } = params;
   
-  if (!kitId) {
-    return jsonResponse(
-      { 
-        ok: false,
-        error: {
-          code: "MISSING_ID",
-          message: "Kit ID is required"
-        }
-      },
-      400
-    );
-  }
-  
-  logger.info('Regenerating resume kit with tighter content', { kitId });
-  
-  // Check if prisma is available
-  if (!prisma) {
-    throw new Error('Database client is not available');
-  }
-  
-  // Get the kit from the database
-  const kit = await prisma.resumeKit.findUnique({
-    where: { id: kitId }
-  }).catch(dbError => {
-    logger.error('Database error fetching kit', { 
-      kitId, 
-      error: dbError instanceof Error ? dbError.message : String(dbError) 
-    });
-    throw new Error('Database error: Failed to fetch resume kit');
-  });
-  
-  if (!kit) {
-    logger.warn('Resume kit not found for regeneration', { kitId });
-    return jsonResponse(
-      { 
-        ok: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Resume kit not found"
-        }
-      },
-      404
-    );
-  }
-  
-  // Get the original PDF path
-  const originalPdfPath = path.join(process.cwd(), "public", kit.resumeUrl.replace(/^\//, ""));
-  
-  // Check if the original PDF exists
-  if (!fs.existsSync(originalPdfPath)) {
-    logger.warn('Original PDF not found for regeneration', { kitId, path: originalPdfPath });
-    return jsonResponse(
-      { 
-        ok: false,
-        error: {
-          code: "FILE_NOT_FOUND",
-          message: "Original PDF not found"
-        }
-      },
-      404
-    );
-  }
-  
   try {
-    // Read the original PDF
-    const originalPdfBytes = fs.readFileSync(originalPdfPath);
-    
-    // Get the resume content from the database or a file
-    // This is a simplified example - in a real app, you'd retrieve the structured content
-    const resumeContent = {
-      summary: "A more concise professional summary focusing on key achievements.",
-      skills: ["Key Skill 1", "Key Skill 2", "Key Skill 3"],
-      experience: [
-        {
-          role: kit.role || "Software Engineer",
-          company: kit.company || "Example Company",
-          dates: kit.dates || "2020 - Present",
-          bullets: [
-            "Implemented key features resulting in 30% performance improvement",
-            "Led team of 5 developers on critical project",
-            "Reduced bug count by 45% through improved testing"
-          ]
+    debugLogger.debug('Regenerating resume kit', { component: 'API:resume-kit/[kitId]/regenerate', kitId });
+
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      debugLogger.debug('Authentication failed', { component: 'API:resume-kit/[kitId]/regenerate', session });
+      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+    }
+
+    // Get resume kit
+    let kit;
+    if (isDbEnabled) {
+      debugLogger.debug('Fetching resume kit from database', { component: 'API:resume-kit/[kitId]/regenerate', kitId });
+      kit = await (prisma as any)!.resumeKit.findUnique({
+        where: { id: kitId }
+      });
+    } else {
+      debugLogger.debug('Fetching mock resume kit', { component: 'API:resume-kit/[kitId]/regenerate', kitId });
+      kit = getMockResumeKit(kitId);
+    }
+
+    if (!kit) {
+      debugLogger.debug('Resume kit not found', { component: 'API:resume-kit/[kitId]/regenerate', kitId });
+      return NextResponse.json({ success: false, error: { message: 'Resume kit not found' } }, { status: 404 });
+    }
+
+    // Check if user has access to this kit
+    if (kit.userId !== (session.user as any).id) {
+      debugLogger.debug('User does not have access to this kit', { 
+        component: 'API:resume-kit/[kitId]/regenerate', 
+        kitId, 
+        userId: (session.user as any).id, 
+        kitUserId: kit.userId 
+      });
+      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 403 });
+    }
+
+    // Check user credits
+    let user;
+    if (isDbEnabled) {
+      debugLogger.debug('Checking user credits in database', { component: 'API:resume-kit/[kitId]/regenerate' });
+      user = await (prisma as any)!.user.findUnique({
+        where: { id: (session.user as any).id }
+      });
+    } else {
+      user = { credits: 30 }; // Mock user with credits
+    }
+
+    if (!user || user.credits <= 0) {
+      debugLogger.debug('Insufficient credits', { 
+        component: 'API:resume-kit/[kitId]/regenerate',
+        userId: (session.user as any).id, 
+        credits: user?.credits 
+      });
+      return NextResponse.json(
+        { success: false, error: { message: 'Insufficient credits' } },
+        { status: 402 }
+      );
+    }
+
+    // Update kit status to pending for regeneration
+    if (isDbEnabled) {
+      await (prisma as any)!.resumeKit.update({
+        where: { id: kitId },
+        data: { 
+          status: 'pending',
+          error: null
         }
-      ],
-      education: "BS Computer Science, Example University, 2019"
-    };
-    
-    // Generate a new format-preserving PDF with tighter content
-    const formatPreservedPdf = await formatPreservingResume({
-      inputPdfBytes: new Uint8Array(originalPdfBytes),
-      tailoredSections: resumeContent
-    });
-    
-    // Generate new PDFs
-    const newKit = await generateResumeKitPdfs(
-      {
-        resume_markdown: "Tighter, more concise resume content",
-        cover_letter_markdown: "Tighter, more concise cover letter",
-        ats_report: {
-          overallScore: 95,
-          keywordCoverage: {
-            matched: ["keyword1", "keyword2"],
-            missingCritical: [],
-            niceToHave: ["keyword3"]
-          },
-          sectionScores: {
-            summary: 9,
-            skills: 10,
-            experience: 9,
-            projects: 8,
-            education: 9
-          },
-          redFlags: [],
-          lengthAndFormatting: {
-            pageCountOK: true,
-            lineSpacingOK: true,
-            bulletsOK: true
-          },
-          concreteEdits: [],
-          finalRecommendations: ["Your resume is now optimized for one page"]
-        }
-      },
-      formatPreservedPdf,
-      kitId
-    );
-    
-    // Update the kit in the database
-    const updatedKit = await prisma.resumeKit.update({
-      where: { id: kitId },
+      });
+    } else {
+      updateMockResumeKit(kitId, { 
+        status: 'pending',
+        error: undefined
+      });
+    }
+
+    // In a real implementation, we would trigger the generation process here
+    // For now, just return success
+    return NextResponse.json({
+      success: true,
       data: {
-        resumeUrl: newKit.resumePdfUrl,
-        coverLetterUrl: newKit.coverLetterPdfUrl,
-        atsReportUrl: newKit.atsReportPdfUrl,
-        resumeDocxUrl: newKit.resumeDocxUrl,
-        coverLetterDocxUrl: newKit.coverLetterDocxUrl,
-        atsReportDocxUrl: newKit.atsReportDocxUrl,
-        updatedAt: new Date()
+        id: kitId,
+        status: 'pending'
       }
     });
-    
-    // Get the current usage
-    const usage = getUserUsage();
-    
-    return jsonResponse({
-      ok: true,
-      kit: updatedKit,
-      usage
-    });
   } catch (error) {
-    logger.error('Error regenerating resume kit', { 
+    debugLogger.error('Error regenerating resume kit', { 
+      component: 'API:resume-kit/[kitId]/regenerate', 
       kitId,
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    throw error; // Let the error handler take care of it
+    return NextResponse.json(
+      { success: false, error: { message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' } },
+      { status: 500 }
+    );
   }
-});
+}
+
+// Set CORS headers
+export const OPTIONS = async () => {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+};

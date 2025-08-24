@@ -1,28 +1,20 @@
-/**
- * Interface for AI provider responses
- */
-export interface AIGenerateResponse {
-  resumeContent: string;
-  coverLetterContent: string;
-  name?: string;
-  id: string;
+export interface RouterResult<T = any> {
+  content: T;
+  provider: string;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
-/**
- * Interface for AI provider options
- */
-export interface AIGenerateOptions {
-  resumeText: string;
-  jobDescription: string;
-  includeOriginalContent?: boolean;
+export interface PromptInput {
+  system: string;
+  user: string;
+  temperature?: number;
+  max_tokens?: number;
+  stop?: string[];
 }
 
-/**
- * Interface for AI providers
- */
-export interface AIProvider {
-  /**
-   * Generate optimized resume and cover letter
-   */
-  generateResume(options: AIGenerateOptions): Promise<AIGenerateResponse>;
-}
+export type Provider = 'auto' | 'google' | 'openai' | 'anthropic';

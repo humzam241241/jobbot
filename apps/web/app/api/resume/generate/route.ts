@@ -1,209 +1,354 @@
-import { NextRequest } from "next/server";
-import { z } from "zod";
-import { extractTextFromPdf } from "@/lib/pdf/extract";
-import { extractTextFromNodePdf } from "@/lib/pdf/node-pdf-parser";
-import { generateWithAuto } from "@/lib/ai/router";
-import { resumeSuperPrompt } from "@/lib/prompts/resume";
-import { generateResumeKitPdfs } from "@/lib/pdf/generate";
-import { createLogger } from '@/lib/logger';
-// Import but don't use directly - we'll try/catch this
-import { formatPreservingResume } from "@/lib/pdf/formatPreserving";
-import { prisma } from "@/lib/db";
-import { incrementUsage, getUserUsage, hasReachedLimit } from "@/lib/usage/counter";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma, getMockUser, createMockResumeKit, updateMockResumeKit } from '@/lib/db';
+import fs from 'fs';
+import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { sanitizeForJson } from "@/lib/utils/safeJson";
-import { withErrorHandler, jsonResponse } from "@/app/api/error-handler";
+import { debugLogger } from '@/lib/utils/debug-logger';
+import { generateContent } from '@/lib/pipeline/generateContent';
+import { createAtsReport } from '@/lib/pipeline/atsReport';
+import { extractProfile } from '@/lib/extractors/extractProfile';
+import puppeteer from 'puppeteer';
+import type { ResumeKit } from '@/lib/types/resumeKit';
 
-const logger = createLogger('resume-api');
+// Helper: DB enabled?
+const hasValidDatabaseUrl = typeof process.env.DATABASE_URL === 'string' && /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '');
+const isDbEnabled = process.env.SKIP_DB !== '1' && !!hasValidDatabaseUrl && !!prisma;
 
-export const dynamic = "force-dynamic"; // safe for dev
+// Create logs directory if it doesn't exist
+const LOG_DIR = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(LOG_DIR)) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
-const formSchema = z.object({
-  file: z.instanceof(Blob),
-  jobUrl: z.string().optional(),
-  jobDescription: z.string().optional(),
-  provider: z.enum(["auto", "google", "openai", "anthropic"]).default("auto"),
-  model: z.string().optional()
-});
+// Create artifacts directory if it doesn't exist
+const ARTIFACTS_DIR = path.join(process.cwd(), 'public/kits');
+if (!fs.existsSync(ARTIFACTS_DIR)) {
+  fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
+}
 
-// Original handler wrapped with error handling
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const form = await req.formData();
-
-  // Parse and validate input
-  const input = formSchema.parse({
-    file: form.get("file"),
-    jobUrl: (form.get("jobUrl") || "") as string,
-    jobDescription: (form.get("jobDescription") || "") as string,
-    provider: (form.get("provider") || "auto") as any,
-    model: (form.get("model") || "") as string
+/**
+ * Converts HTML to PDF using Puppeteer
+ */
+async function htmlToPdf(html: string, outputPath: string): Promise<void> {
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-
-  const file = input.file as File;
-
-  logger.info('Received form data', {
-    fileInfo: { type: file.type, name: file.name, size: file.size },
-    provider: input.provider,
-    model: input.model || undefined,
-    hasJobDescription: Boolean(input.jobDescription),
-    hasJobUrl: Boolean(input.jobUrl),
-    rawJobUrl: (input.jobUrl || "").slice(0, 80),
-    rawJobDescription: (input.jobDescription || "").slice(0, 80)
-  });
-
-  // Check usage limit before proceeding
-  if (hasReachedLimit()) {
-    logger.warn('User has reached usage limit');
-    return jsonResponse(
-      { 
-        ok: false,
-        error: { 
-          code: "USAGE_LIMIT", 
-          message: "You have reached your usage limit. Please try again later." 
-        },
-        usage: getUserUsage()
-      },
-      429
-    );
-  }
-
-  // Validate file type
-  if (!file || file.type !== "application/pdf") {
-    logger.warn('Invalid file type', { type: file.type });
-    return jsonResponse(
-      { 
-        ok: false,
-        error: { 
-          code: "BAD_FILE", 
-          message: "Please upload a PDF resume." 
-        }
-      },
-      400
-    );
-  }
-
-  // Extract text from PDF
-  const buf = Buffer.from(await file.arrayBuffer());
-  
-  let extractedText = '';
-  let pages = 0;
   
   try {
-    // Try the Node.js compatible parser first
-    logger.info('Attempting to extract text using Node PDF parser');
-    extractedText = await extractTextFromNodePdf(buf);
-    pages = 1; // We're only processing the first page for now
-  } catch (extractError) {
-    logger.warn('Node PDF parser failed, falling back to standard extractor', { 
-      error: extractError instanceof Error ? extractError.message : String(extractError) 
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.pdf({
+      path: outputPath,
+      format: 'Letter',
+      margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
+      printBackground: true
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const requestId = uuidv4();
+  const startTime = Date.now();
+  const logs: any[] = [];
+  
+  function log(message: string, data?: any) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      message,
+      data,
+      requestId
+    };
+    logs.push(entry);
+    debugLogger.debug(message, { component: 'API:resume/generate', data });
+  }
+
+  try {
+    log('Request received', { requestId });
+    
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      log('Authentication failed', { session });
+      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+    }
+    
+    log('User authenticated', { userId: (session.user as any).id });
+
+    // Parse form data
+    const formData = await request.formData();
+    const resume = formData.get('resume') as File;
+    const jobDescription = formData.get('jobDescription') as string;
+    const jobUrl = formData.get('jobUrl') as string;
+    const provider = formData.get('provider') as string;
+    const model = formData.get('model') as string;
+    
+    log('Form data parsed', { 
+      hasResume: !!resume,
+      resumeSize: resume?.size,
+      resumeType: resume?.type,
+      jobDescriptionLength: jobDescription?.length,
+      hasJobUrl: !!jobUrl,
+      provider,
+      model
+    });
+
+    // Validate inputs
+    if (!resume || !jobDescription) {
+      log('Validation failed', { resume: !!resume, jobDescription: !!jobDescription });
+      return NextResponse.json(
+        { success: false, error: { message: 'Resume and job description are required' } },
+        { status: 400 }
+      );
+    }
+
+    // Check file type
+    if (resume.type !== 'application/pdf') {
+      log('Invalid file type', { type: resume.type });
+      return NextResponse.json(
+        { success: false, error: { message: 'Only PDF files are supported' } },
+        { status: 400 }
+      );
+    }
+
+    // Check usage credits
+    let user: any;
+    try {
+      if (isDbEnabled) {
+        log('Checking user credits in database');
+        user = await (prisma as any)!.user.findUnique({
+          where: { id: (session.user as any).id }
+        });
+      } else {
+        log('Using mock user');
+        user = getMockUser((session.user as any).id || 'mock-user');
+      }
+      
+      if (!user || (typeof user.credits === 'number' && user.credits <= 0)) {
+        log('Insufficient credits', { userId: (session.user as any).id, credits: user?.credits });
+        return NextResponse.json(
+          { success: false, error: { message: 'Insufficient credits' } },
+          { status: 402 }
+        );
+      }
+      
+      log('User has credits', { credits: user.credits ?? 'mock' });
+    } catch (error) {
+      log('Error checking credits', { error: String(error) });
+      return NextResponse.json(
+        { success: false, error: { message: 'Error checking credits' } },
+        { status: 500 }
+      );
+    }
+
+    // Create resume kit
+    let kit: any;
+    try {
+      const kitId = `kit_${Date.now()}`;
+      const kitDir = path.join(ARTIFACTS_DIR, kitId);
+      fs.mkdirSync(kitDir, { recursive: true });
+
+      const kitData: Partial<ResumeKit> = {
+        id: kitId,
+        userId: (session.user as any).id,
+        status: 'pending',
+        originalResume: 'Processing...',
+        jobDescription,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      if (isDbEnabled) {
+        log('Creating resume kit in database');
+        kit = await (prisma as any)!.resumeKit.create({ data: kitData });
+      } else {
+        log('Creating mock resume kit');
+        kit = createMockResumeKit(kitData);
+      }
+      
+      log('Resume kit created', { kitId: kit.id });
+
+      // Convert resume to buffer
+      const resumeBuffer = Buffer.from(await resume.arrayBuffer());
+      
+      // Extract profile from resume
+      log('Extracting profile');
+      const profile: any = await extractProfile(resumeBuffer, resume.type);
+      log('Profile extracted', { profile });
+      
+      // Generate content
+      log('Generating content');
+      const { resumeHtml, coverHtml } = await generateContent({
+        resumeOriginalText: resumeBuffer.toString('utf-8'),
+        jdText: jobDescription,
+        jdUrl: jobUrl,
+        modelHint: model,
+        profile,
+        kitId: kit.id
+      });
+      log('Content generated');
+
+      // Generate ATS report
+      log('Generating ATS report');
+      const { url: atsUrl, score: atsScore, reportHtml } = await createAtsReport({
+        resumeText: resumeBuffer.toString('utf-8'),
+        jdText: jobDescription,
+        profile,
+        kitId: kit.id
+      });
+      log('ATS report generated', { atsScore });
+
+      // Save artifacts
+      const resumePath = path.join(kitDir, 'resume.pdf');
+      const coverPath = path.join(kitDir, 'cover-letter.pdf');
+      const atsPath = path.join(kitDir, 'ats.html');
+
+      // Convert HTML to PDF
+      log('Converting resume to PDF');
+      await htmlToPdf(resumeHtml, resumePath);
+      log('Converting cover letter to PDF');
+      await htmlToPdf(coverHtml, coverPath);
+      log('Saving ATS report');
+      fs.writeFileSync(atsPath, reportHtml);
+
+      // Verify files exist and have content
+      const fileStats = await Promise.all([
+        fs.promises.stat(resumePath),
+        fs.promises.stat(coverPath),
+        fs.promises.stat(atsPath)
+      ]);
+
+      const allFilesValid = fileStats.every(stat => stat.size > 0);
+      if (!allFilesValid) {
+        throw new Error('Generated files validation failed');
+      }
+
+      // Update kit with results
+      const updateData: Partial<ResumeKit> = {
+        status: 'completed',
+        tailoredResume: `/kits/${kitId}/resume.pdf`,
+        coverLetter: `/kits/${kitId}/cover-letter.pdf`,
+        atsReport: `/kits/${kitId}/ats.html`,
+        updatedAt: new Date()
+      };
+
+      if (isDbEnabled) {
+        // Use transaction to update kit and decrement credits atomically
+        await (prisma as any)!.$transaction([
+          (prisma as any)!.resumeKit.update({
+            where: { id: kit.id },
+            data: updateData
+          }),
+          (prisma as any)!.user.update({
+            where: { id: (session.user as any).id },
+            data: {
+              credits: {
+                decrement: 1
+              }
+            } as any
+          })
+        ]);
+        log('Database updated in transaction');
+      } else {
+        log('Updating mock resume kit');
+        kit = updateMockResumeKit(kit.id, updateData);
+      }
+
+      // Return success
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: kit.id,
+          status: 'completed',
+          atsScore,
+          artifacts: {
+            resume: updateData.tailoredResume,
+            coverLetter: updateData.coverLetter,
+            atsReport: updateData.atsReport
+          }
+        }
+      });
+
+    } catch (error) {
+      const err = error as Error;
+      log('Error during generation', { 
+        error: err?.message || String(err),
+        stack: err?.stack,
+        name: err?.name
+      });
+      
+      // Update kit status to failed
+      const failureData: Partial<ResumeKit> = {
+        status: 'failed',
+        error: err.message,
+        updatedAt: new Date()
+      };
+
+      if (isDbEnabled && kit) {
+        await (prisma as any)!.resumeKit.update({
+          where: { id: kit.id },
+          data: failureData
+        });
+      } else if (kit) {
+        updateMockResumeKit(kit.id, failureData);
+      }
+      
+      // Save error logs
+      const errorLogFileName = `resume-generate-error-${requestId}-${Date.now()}.json`;
+      const errorLogPath = path.join(LOG_DIR, errorLogFileName);
+      
+      const errorLogData = {
+        requestId,
+        timestamp: new Date().toISOString(),
+        duration: Date.now() - startTime,
+        error: {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        },
+        logs
+      };
+      
+      fs.writeFileSync(errorLogPath, JSON.stringify(errorLogData, null, 2));
+
+      return NextResponse.json(
+        { success: false, error: { message: 'Generation failed', code: 'GENERATION_ERROR' } },
+        { status: 500 }
+      );
+    }
+
+  } catch (error: any) {
+    log('Unexpected error', { 
+      error: error.message, 
+      stack: error.stack,
+      name: error.name
     });
     
-    // Fall back to the standard extractor
-    const extracted = await extractTextFromPdf(buf);
-    extractedText = extracted.text || '';
-    pages = extracted.pages;
-  }
-  
-  if (!extractedText) {
-    logger.error('Failed to extract text from PDF', { pages });
-    return jsonResponse(
-      { 
-        ok: false,
-        error: { 
-          code: "EMPTY_PDF", 
-          message: "Could not read text from the PDF." 
-        }
+    // Save error logs
+    const errorLogFileName = `resume-generate-error-${requestId}-${Date.now()}.json`;
+    const errorLogPath = path.join(LOG_DIR, errorLogFileName);
+    
+    const errorLogData = {
+      requestId,
+      timestamp: new Date().toISOString(),
+      duration: Date.now() - startTime,
+      error: {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
       },
-      400
+      logs
+    };
+    
+    fs.writeFileSync(errorLogPath, JSON.stringify(errorLogData, null, 2));
+    
+    return NextResponse.json(
+      { success: false, error: { message: 'Internal server error', code: 'INTERNAL_ERROR' } },
+      { status: 500 }
     );
   }
-
-  logger.info('PDF text extracted', { 
-    pages, 
-    textLength: extractedText.length 
-  });
-
-  // Generate a unique ID for this kit
-  const kitId = uuidv4();
-
-  // Check if prisma is available
-  if (!prisma) {
-    throw new Error('Database client is not available');
-  }
-
-  // Use a transaction to ensure all operations succeed or fail together
-  const result = await prisma.$transaction(async (tx) => {
-    // Build prompt
-    const prompt = resumeSuperPrompt({
-      rawResumeText: extractedText,
-      jobDescriptionText: input.jobDescription || ""
-    });
-
-    logger.info('Starting AI generation', {
-      kitId,
-      providerPreferred: input.provider,
-      hasJobDescription: Boolean(input.jobDescription),
-      resumeLength: extractedText.length
-    });
-
-    // Generate content with AI
-    const result = await generateWithAuto(prompt, input.provider as any);
-
-    logger.info('AI generation successful', {
-      kitId,
-      provider: result.providerUsed,
-      resumeLength: result.resume_markdown.length,
-      coverLetterLength: result.cover_letter_markdown.length,
-      atsScore: result.ats_report.score || 0
-    });
-
-    // Generate format-preserving PDF if possible
-    let formatPreservedPdf: Uint8Array | null = null;
-    
-    // Skip format-preserving PDF in Node.js environment for now
-    // This avoids the DOMMatrix error
-    logger.info('Skipping format-preserving PDF in Node environment, using standard PDF generation', { kitId });
-
-    // Generate PDFs (either standard or use the format-preserved one)
-    const kit = await generateResumeKitPdfs(result as any, formatPreservedPdf, kitId);
-
-    logger.info('Resume kit generated', { kitId, ...kit });
-
-    // Create a record in the database
-    // @ts-ignore - Prisma transaction type issue
-    const kitRecord = await tx.resumeKit.create({
-      data: {
-        id: kitId,
-        provider: result.providerUsed,
-        model: input.model || undefined,
-        resumeUrl: kit.resumePdfUrl,
-        coverLetterUrl: kit.coverLetterPdfUrl,
-        atsReportUrl: kit.atsReportPdfUrl,
-        resumeDocxUrl: kit.resumeDocxUrl,
-        coverLetterDocxUrl: kit.coverLetterDocxUrl,
-        atsReportDocxUrl: kit.atsReportDocxUrl,
-        createdAt: new Date()
-      }
-    });
-
-    // Increment usage only after successful generation
-    const usage = await incrementUsage('resume-kit', tx);
-
-    return {
-      kitId,
-      provider: result.providerUsed,
-      results: kit,
-      usage
-    };
-  });
-
-  logger.info('Transaction completed successfully', { kitId });
-
-  return jsonResponse({
-    ok: true,
-    kitId: result.kitId,
-    provider: result.provider,
-    results: result.results,
-    usage: result.usage
-  });
-});
+}

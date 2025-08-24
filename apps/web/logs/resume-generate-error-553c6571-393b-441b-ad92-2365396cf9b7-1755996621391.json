@@ -1,0 +1,124 @@
+{
+  "requestId": "553c6571-393b-441b-ad92-2365396cf9b7",
+  "timestamp": "2025-08-24T00:50:21.391Z",
+  "duration": 559,
+  "error": {
+    "message": "The \"path\" argument must be of type string. Received undefined",
+    "stack": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received undefined\n    at Object.join (node:path:508:7)\n    at generateContent (webpack-internal:///(rsc)/./lib/pipeline/generateContent.ts:42:68)\n    at POST (webpack-internal:///(rsc)/./app/api/resume/generate/route.ts:211:131)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.dev.js:6:55038\n    at async ek.execute (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.dev.js:6:45808)\n    at async ek.handle (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.dev.js:6:56292)\n    at async doRender (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:1377:42)\n    at async cacheEntry.responseCache.get.routeKind (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:1599:28)\n    at async DevServer.renderToResponseWithComponentsImpl (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:1507:28)\n    at async DevServer.renderPageComponent (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:1931:24)\n    at async DevServer.renderToResponseImpl (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:1969:32)\n    at async DevServer.pipeImpl (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:920:25)\n    at async NextNodeServer.handleCatchallRenderRequest (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\next-server.js:272:17)\n    at async DevServer.handleRequestImpl (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\base-server.js:816:17)\n    at async C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\dev\\next-dev-server.js:339:20\n    at async Span.traceAsyncFn (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\trace\\trace.js:154:20)\n    at async DevServer.handleRequest (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\dev\\next-dev-server.js:336:24)\n    at async invokeRender (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\lib\\router-server.js:174:21)\n    at async handleRequest (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\lib\\router-server.js:353:24)\n    at async requestHandlerImpl (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\lib\\router-server.js:377:13)\n    at async Server.requestListener (C:\\Users\\humza\\resume_bot\\node_modules\\.pnpm\\next@14.2.5_@opentelemetry+api@1.9.0_@playwright+test@1.55.0_react-dom@18.2.0_react@18.2.0__react@18.2.0\\node_modules\\next\\dist\\server\\lib\\start-server.js:141:13)"
+  },
+  "logs": [
+    {
+      "timestamp": "2025-08-24T00:50:20.832Z",
+      "message": "Request received",
+      "data": {
+        "requestId": "553c6571-393b-441b-ad92-2365396cf9b7"
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.954Z",
+      "message": "User authenticated",
+      "data": {
+        "userId": "cme8xxbkl00001vp879pqs065"
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.964Z",
+      "message": "Form data parsed",
+      "data": {
+        "hasResume": true,
+        "resumeSize": 128376,
+        "resumeType": "application/pdf",
+        "jobDescriptionLength": 2875,
+        "hasJobUrl": false,
+        "provider": "Google",
+        "model": "Gemini 2.5 Pro"
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.964Z",
+      "message": "Using mock user"
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.964Z",
+      "message": "User has credits",
+      "data": {
+        "credits": 30
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.965Z",
+      "message": "Creating mock resume kit"
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.965Z",
+      "message": "Resume kit created",
+      "data": {
+        "kitId": "mock-1755996620965"
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:20.967Z",
+      "message": "Extracting profile"
+    },
+    {
+      "timestamp": "2025-08-24T00:50:21.237Z",
+      "message": "Profile extracted",
+      "data": {
+        "profile": {
+          "name": "HUMZA MUHAMMAD",
+          "email": "humza.muhammad1@ontariotechu.net",
+          "phone": "905-749-6855",
+          "skills": [
+            "orks (GD&T",
+            "FEA",
+            "CFD)",
+            "prototyping",
+            "and"
+          ],
+          "experience": [
+            {
+              "company": "Feb 2023",
+              "title": "project manager for Version 1, leading design reviews, CAD modeling, and manufacturing drawings.",
+              "location": "leading design reviews, CAD modeling, and manufacturing drawings",
+              "startDate": "Feb 2023",
+              "endDate": "Present",
+              "bullets": [
+                "Professional experience"
+              ]
+            }
+          ],
+          "education": [
+            {
+              "school": "Bachelor of Engineering (Honours) - Mechanical Engineering (Co-op), Artificial Intelligence Specialization, Ontario Tech",
+              "degree": "Bachelor",
+              "field": "Engineering",
+              "startDate": "",
+              "endDate": "",
+              "gpa": ""
+            },
+            {
+              "school": "University - Oshawa, ON | Sept 2022 - May 2028 CGPA: 3.75 | President's List (Multiple Terms)",
+              "degree": "",
+              "field": "",
+              "startDate": "Sept 2022",
+              "endDate": "May 2028",
+              "gpa": "3.75"
+            }
+          ],
+          "projects": []
+        }
+      }
+    },
+    {
+      "timestamp": "2025-08-24T00:50:21.237Z",
+      "message": "Generating content"
+    },
+    {
+      "timestamp": "2025-08-24T00:50:21.391Z",
+      "message": "Error during generation",
+      "data": {
+        "error": "The \"path\" argument must be of type string. Received undefined"
+      }
+    }
+  ]
+}

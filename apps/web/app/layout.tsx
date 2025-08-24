@@ -1,31 +1,25 @@
-import './globals.css'
-import AuthProvider from '@/components/AuthProvider';
-import { Analytics } from "@vercel/analytics/react";
-import TopNav from '@/components/layout/TopNav';
-import SessionWatcher from './(components)/SessionWatcher';
-import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from 'react-hot-toast';
+import { Providers } from './providers';
+import './globals.css';
 
 export const metadata = {
-  title: "JobBot",
-  description: "AI-powered resume tailoring and job application assistant",
+  title: 'JobBot - AI Resume Assistant',
+  description: 'Tailor your resume to job descriptions with AI',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className="dark">
-      <head></head>
-      <body className="bg-background text-foreground antialiased">
-        <ErrorBoundary>
-          <AuthProvider>
-            <TopNav />
-            <SessionWatcher />
-            {children}
-            <Toaster position="top-right" />
-          </AuthProvider>
-        </ErrorBoundary>
+    <html lang="en">
+      <body className="font-sans">
+        <Providers>
+          {children}
+          <Toaster position="top-right" />
+        </Providers>
       </body>
     </html>
   );
 }
-

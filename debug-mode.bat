@@ -1,30 +1,46 @@
 @echo off
-echo Starting JobBot in Debug Mode...
-echo ============================
+echo Setting up JobBot in debug mode...
+echo.
 
-:: Create logs directory if it doesn't exist
-if not exist logs mkdir logs
+REM Set environment variables
+set ALWAYS_SHOW_SIGNIN=1
+set DEBUG_MODE=true
+set SKIP_DB=1
 
-:: Set development environment variables
-set NODE_ENV=development
-set NEXT_PUBLIC_DEBUG=true
+REM Clear browser session data
+echo Clearing browser session data...
+taskkill /F /IM chrome.exe /T >nul 2>&1
+taskkill /F /IM msedge.exe /T >nul 2>&1
+taskkill /F /IM firefox.exe /T >nul 2>&1
 
-:: Kill any process using port 3000 (if exists)
-for /f "tokens=5" %%a in ('netstat -aon ^| find ":3000"') do (
-    taskkill /F /PID %%a 2>nul
+REM Kill any running Node processes
+echo Cleaning up Node processes...
+taskkill /F /IM node.exe >nul 2>&1
+
+REM Clean Next.js cache
+echo Cleaning Next.js cache...
+if exist "apps\web\.next" (
+  rmdir /s /q "apps\web\.next"
 )
 
-:: Start the development server in the background
-start /B pnpm dev
+REM Install dependencies if needed
+echo Checking dependencies...
+if not exist "node_modules" (
+  echo Installing dependencies...
+  call pnpm install
+)
 
-:: Wait for the server to start (adjust sleep time if needed)
-timeout /t 5 /nobreak
+REM Start the application
+echo Starting JobBot...
+echo.
+echo ====================================
+echo JobBot Debug Mode
+echo ====================================
+echo.
+echo Navigate to http://localhost:3000
+echo You will be redirected to the login page
+echo Default credits: 30
+echo Debug logging: Enabled
+echo.
 
-:: Open the debug page in the default browser
-start http://localhost:3000/debug
-
-:: Open the logs directory
-start logs
-
-:: Show the logs in real-time using PowerShell
-powershell -Command "Get-Content -Path '.\logs\error.log' -Wait"
+cd apps/web && pnpm dev -p 3000

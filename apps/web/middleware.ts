@@ -1,35 +1,50 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import { withAuth } from 'next-auth/middleware';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default withAuth(
-  function middleware(req) {
-    // Force revalidation of auth state
-    const response = NextResponse.next();
-    response.headers.set('Cache-Control', 'no-store, max-age=0');
-    return response;
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
-    pages: {
-      signIn: '/login',
-    },
+export default async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  
+  // Always redirect root to login
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/login', req.url));
   }
-);
+
+  // Protected routes that require authentication
+  const protectedRoutes = ['/dashboard', '/jobbot', '/results', '/applications', '/library', '/settings'];
+  
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  if (isProtectedRoute) {
+    const authMiddleware = await withAuth({
+      pages: {
+        signIn: '/login',
+      },
+      callbacks: {
+        authorized: ({ token }) => !!token,
+      },
+    });
+    
+    // @ts-ignore - withAuth returns a function
+    return authMiddleware(req);
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-  // Protected routes that require authentication
   matcher: [
+    '/',
     '/dashboard/:path*',
     '/jobbot/:path*',
+    '/results/:path*',
     '/applications/:path*',
-    '/settings/:path*',
     '/library/:path*',
-    '/file-manager/:path*',
-    '/scraper/:path*',
+    '/settings/:path*',
     '/api/resume/:path*',
-    '/api/applications/:path*',
-    '/api/library/:path*',
+    '/api/usage/:path*',
+    '/api/resume-kit/:path*',
   ],
 };
