@@ -1,42 +1,37 @@
 @echo off
-SETLOCAL ENABLEEXTENSIONS ENABLEDELAYEDEXPANSION
-
 echo Starting JobBot...
 echo =================
-echo.
 
-REM Set environment variables
-set "SKIP_DB=1"
-set "NODE_ENV=development"
-set "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/jobbot"
-
-REM Clean and install only web dependencies
-echo Installing web app dependencies...
-cd apps\web
-
-REM Clean build cache and modules
-if exist ".next" rd /s /q ".next"
-if exist "node_modules" rd /s /q "node_modules"
-
-REM Create storage directories if they don't exist
-if not exist "..\..\storage\kits" mkdir "..\..\storage\kits"
-
-REM Install dependencies
-echo Installing dependencies...
-call pnpm install
-if !ERRORLEVEL! NEQ 0 (
-    echo Error: Failed to install dependencies
-    pause
-    exit /b 1
+rem Clean Next.js cache to avoid stale builds
+echo Cleaning Next.js cache...
+if exist apps\web\.next (
+  rmdir /s /q apps\web\.next
 )
 
-echo.
+rem Install dependencies for the web app
+echo Installing web app dependencies...
+cd apps\web
+call pnpm install
+if %errorlevel% neq 0 (
+  echo Failed to install web app dependencies!
+  exit /b %errorlevel%
+)
+
+rem Generate Prisma client
+echo Generating Prisma client...
+call pnpm prisma generate
+if %errorlevel% neq 0 (
+  echo Failed to generate Prisma client!
+  exit /b %errorlevel%
+)
+
+rem Start the development server
 echo Starting development server...
 echo ===========================
-echo.
+call pnpm dev
+if %errorlevel% neq 0 (
+  echo Failed to start development server!
+  exit /b %errorlevel%
+)
 
-REM Start the app and open browser
-start http://localhost:3000/login
-call pnpm run dev
-
-pause
+cd ..\..

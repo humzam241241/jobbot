@@ -1,28 +1,47 @@
-# Environment variables
-.env
-.env.local
-.env.*.local
-!.env.example
+# dependencies
+node_modules
+.pnp
+.pnp.js
 
-# Secrets
-*.pem
-*.key
-*.crtnode_modules/
-**/node_modules/
+# testing
+coverage
+
+# next.js
 .next/
-**/.next/
-debug/
-**/debug/
-*.log
-**/*.log
-apps/web/public/resumes/
-**/*.pdf
-**/*.docx
-apps/web/playwright-report/
-apps/web/test-results/
-apps/web/prisma/dev.db
-resume-bot/apps/.expo/
+out/
+build
+dist
 
-# Proprietary font drop-ins (if user adds locally)
-apps/web/public/fonts/Proprietary-*.ttf
-apps/web/public/fonts/Proprietary-*.otf
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env
+.env.development
+.env.production
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Generated files
+generated
+
+# Kit files
+kits/
+uploads/
+temp/
+
+# LibreOffice lock files
+.~lock.*

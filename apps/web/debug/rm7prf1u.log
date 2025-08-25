@@ -1,0 +1,3 @@
+{"ts":"2025-08-21T19:44:40.278Z","traceId":"rm7prf1u","component":"pipeline","level":"info","message":"start","data":{"fileName":"resume july 2025 v0.pdf"}}
+{"ts":"2025-08-21T19:44:40.517Z","traceId":"rm7prf1u","component":"pipeline","level":"info","message":"parsed","data":{"sections":7}}
+{"ts":"2025-08-21T19:45:13.370Z","traceId":"rm7prf1u","component":"pipeline","level":"info","message":"tailored_ok","data":{}}

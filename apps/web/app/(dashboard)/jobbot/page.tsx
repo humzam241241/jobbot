@@ -161,6 +161,13 @@ function JobBotContent() {
       return;
     }
 
+    // Check if API key and client ID are available
+    if (!GOOGLE_API_KEY || !GOOGLE_CLIENT_ID || !GOOGLE_APP_ID) {
+      toast.error('Google API credentials not configured. Please check your environment variables.');
+      setDebugMessage('Missing Google API credentials in environment variables.');
+      return;
+    }
+
     setIsPickerLoading(true);
     
     try {
@@ -200,8 +207,8 @@ function JobBotContent() {
       const picker = new gapi.picker.PickerBuilder()
         .addView(docsView)
         .setOAuthToken(session.accessToken as string)
-        .setDeveloperKey(GOOGLE_API_KEY as string)
-        .setAppId(GOOGLE_APP_ID as string)
+        .setDeveloperKey(GOOGLE_API_KEY)
+        .setAppId(GOOGLE_APP_ID)
         .setCallback(async (data: any) => {
           if (data.action === 'picked') {
             const file = data.docs[0];
@@ -228,7 +235,7 @@ function JobBotContent() {
     } finally {
       setIsPickerLoading(false);
     }
-  }, [gapiLoaded, gisLoaded, session, GOOGLE_API_KEY, GOOGLE_APP_ID]);
+  }, [gapiLoaded, gisLoaded, session, GOOGLE_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_APP_ID]);
 
   const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, accessToken: string) => {
     setIsLoading(true);
@@ -438,7 +445,7 @@ function JobBotContent() {
             onChange={handleFileChange}
             className="hidden"
           />
-      </div>
+        </div>
 
         {/* File Display */}
         {selectedFile && (
@@ -450,7 +457,7 @@ function JobBotContent() {
               <div className="flex items-center">
                 <FileText className="h-5 w-5 text-gray-400 mr-2" />
                 <span className="text-sm text-gray-600">{selectedFile.name}</span>
-            </div>
+              </div>
             </div>
           </div>
         )}

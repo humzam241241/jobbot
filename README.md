@@ -1,214 +1,104 @@
-# JobBot - AI-Powered Resume Tailoring
+# Resume Bot
 
-JobBot is a full-stack application that helps job seekers optimize their resumes and cover letters for specific job postings using AI. The application analyzes both the user's resume and the target job description to create tailored, ATS-optimized documents.
+A web application that helps users generate tailored resumes, cover letters, and ATS reports based on their existing resume and job descriptions.
 
 ## Features
 
-- **Resume Tailoring**: Upload your resume and job description to generate a tailored, ATS-optimized resume
-- **Cover Letter Generation**: Automatically create personalized cover letters based on your resume and job description
-- **Multiple AI Providers**: Support for OpenAI, Anthropic, and Google AI models
-- **Format Preservation**: Maintains your original resume structure and formatting
-- **Usage Tracking**: Monitor your token usage and generation counts
+- Upload Microsoft Word (DOCX) documents directly or select from Google Drive
+- Convert Google Docs to DOCX format automatically
+- Generate tailored resumes that preserve original formatting
+- Create professional cover letters
+- Generate ATS compatibility reports
+- Support for multiple AI providers (OpenAI, Google, Anthropic, DeepSeek, Mistral)
 
-## Tech Stack
-
-- **Frontend**: Next.js (App Router), React, Tailwind CSS
-- **Backend**: Next.js API Routes, Zod for validation
-- **Database**: PostgreSQL with Prisma ORM
-- **AI Integration**: Multiple provider adapters (OpenAI, Anthropic, Google)
-
-## Getting Started
+## Setup Instructions
 
 ### Prerequisites
 
-- Node.js v18 or later
-- PNPM package manager (`npm install -g pnpm`)
-- PostgreSQL database (optional - see Development without Database below)
+- Node.js 18+ and pnpm
+- LibreOffice (for PDF conversion)
+- Google Cloud account with API credentials (for Google Drive integration)
 
-### Development without Database
+### Environment Setup
 
-You can run the application without a database by setting the `SKIP_DB` environment variable:
+1. Copy the example environment file:
+   ```
+   cp .env.example .env.local
+   ```
+
+2. Fill in your environment variables in `.env.local`:
+   - Generate a `NEXTAUTH_SECRET` (you can use `openssl rand -base64 32`)
+   - Set up Google OAuth credentials in Google Cloud Console
+   - Add API keys for AI providers you plan to use
+
+### Google Cloud Setup
+
+1. Create a project in Google Cloud Console
+2. Enable the following APIs:
+   - Google Drive API
+   - Google Picker API
+   - Google Identity Services
+
+3. Create OAuth 2.0 credentials:
+   - Set authorized JavaScript origins to `http://localhost:3000`
+   - Set authorized redirect URIs to `http://localhost:3000/api/auth/callback/google`
+
+4. Create an API key with restrictions:
+   - Set application restrictions to "Website"
+   - Add `http://localhost:3000/*` to the allowed referrers
+   - Restrict the API key to only the required APIs
+
+### Installation
 
 ```bash
-# PowerShell
-$env:SKIP_DB="1"
-pnpm -C apps/web dev -p 3000
+# Install dependencies
+pnpm install
 
-# CMD
-set SKIP_DB=1 && pnpm -C apps/web dev -p 3000
-```
+# Generate Prisma client
+pnpm -C apps/web prisma generate
 
-### With Database
-
-- Node.js v18 or later
-- PNPM package manager (`npm install -g pnpm`)
-- PostgreSQL database
-- Git
-
-## Windows Quickstart
-
-JobBot includes standardized Windows scripts for easy development and deployment.
-
-### Quick Commands
-
-```bash
 # Start development server
-npm run dev:win
-
-# Build for production
-npm run build:win
-
-# Start production server
-npm run start:win
-
-# Database commands
-npm run db:reset:win    # Reset database (WARNING: deletes all data)
-npm run db:migrate:win  # Run pending migrations
-npm run db:seed:win     # Seed database with initial data
-npm run db:generate:win # Generate Prisma client
-
-# Free up port 3000 if busy
-npm run port-kill
+pnpm -C apps/web dev
 ```
 
-### Common Issues and Fixes
+### Using the Batch File (Windows)
 
-#### Port 3000 is in use
+For Windows users, a batch file is provided for easy startup:
+
 ```bash
-npm run port-kill
+start-jobbot.bat
 ```
 
-#### Database connection issues
-- Check that PostgreSQL is running
-- Verify DATABASE_URL format in .env and .env.local files:
-  ```
-  DATABASE_URL=postgres://postgres:postgres@localhost:5432/jobbot
-  ```
-  Note: Use `postgres://` protocol, not `postgresql://`
-- Create the database manually if needed:
-  ```bash
-  psql -U postgres -c "CREATE DATABASE jobbot;"
-  ```
-- Regenerate Prisma client:
-  ```bash
-  npm run db:generate:win
-  ```
+## Development
 
-#### Missing dependencies
-- Run the development script which will install dependencies automatically:
-  ```bash
-  npm run dev:win
-  ```
-- Or install manually:
-  ```bash
-  pnpm install
-  ```
+### Project Structure
 
-### Manual Setup
+- `apps/web/` - Next.js web application
+  - `app/` - App router components and API routes
+  - `components/` - React components
+  - `lib/` - Utility functions and business logic
+  - `prisma/` - Database schema and migrations
+  - `contexts/` - React context providers
 
-1. Create a `.env.local` file in `apps/web/` with:
-   ```
-   DATABASE_URL="postgres://postgres:postgres@localhost:5432/jobbot"
-   NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="your-secret-key"
-   OPENAI_API_KEY="your-openai-key"
-   ANTHROPIC_API_KEY="your-anthropic-key"
-   GOOGLE_API_KEY="your-google-key"
-   ```
+### Key Technologies
 
-2. Install dependencies:
-   ```bash
-   pnpm install
-   pnpm add -w @google/generative-ai
-   ```
+- Next.js 14 with App Router
+- NextAuth.js for authentication
+- Prisma ORM for database access
+- Tailwind CSS for styling
+- Various AI providers for content generation
+- Google Drive API for document access
+- LibreOffice for document conversion
 
-3. Run database migrations:
-   ```bash
-   cd apps/web
-   npx prisma generate
-   npx prisma migrate dev --name add_usage_tracking
-   cd ../..
-   ```
+## Deployment
 
-4. Start the development server:
-   ```bash
-   pnpm dev
-   ```
+For production deployment, ensure you have:
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+1. Set up proper environment variables
+2. Verified your Google Cloud OAuth application (for production use)
+3. Installed LibreOffice on your production server
+4. Set up a PostgreSQL database
 
-## Troubleshooting
+## License
 
-### Database Connection Issues
-
-If you encounter database connection errors:
-1. Run the `fix-database.bat` script to repair the connection
-2. Check that PostgreSQL is running on port 5432
-3. Verify your DATABASE_URL is correct in both `.env` and `.env.local` files:
-   ```
-   DATABASE_URL=postgres://postgres:postgres@localhost:5432/jobbot
-   ```
-   Note: Use `postgres://` protocol, not `postgresql://`
-4. Create the database manually if needed:
-   ```bash
-   psql -U postgres -c "CREATE DATABASE jobbot;"
-   ```
-5. Try running the migrations manually:
-   ```bash
-   cd apps/web
-   npx prisma generate
-   npx prisma migrate dev --name add_usage_tracking
-   ```
-
-### API Provider Issues
-
-If AI providers aren't working:
-1. Check that your API keys are correctly set in .env.local
-2. Verify the API keys are valid and have sufficient credits
-3. Check the server logs for specific error messages
-4. Try using a different provider (OpenAI, Anthropic, or Google)
-
-### TypeScript/Dependency Issues
-
-If you encounter TypeScript errors or dependency issues:
-1. Run the `update-deps.bat` script to update dependencies
-2. Check for TypeScript errors with `pnpm -w run typecheck`
-3. Clean node_modules cache with `pnpm -w run clean`
-4. Reinstall dependencies with `pnpm install`
-
-### Application Not Loading
-
-If the application doesn't load:
-1. Check the terminal output for errors
-2. Verify that all required environment variables are set
-3. Run the `cleanup-repo.bat` script to clean up any redundant files
-4. Restart the development server with `pnpm dev`
-
-## Usage
-
-1. Navigate to the JobBot page
-2. Upload your resume (PDF or DOCX)
-3. Paste the job description
-4. Select your preferred AI provider (or use Auto)
-5. Click "Generate Resume Kit"
-6. Download the tailored resume and cover letter
-
-## Key Features
-
-### Google Provider Integration
-- Support for latest Gemini models (2.5 Pro, 2.5 Flash)
-- Fallback mechanisms for different model capabilities
-- Robust error handling and provider switching
-- Token usage estimation when exact counts unavailable
-
-### JSON Parsing and Validation
-- Extracts valid JSON from model responses
-- Handles malformed responses gracefully
-- Validates against Zod schemas
-- Provides detailed error messages for debugging
-
-### Usage Tracking
-- Counts tokens per provider and generation
-- Records successful and failed generations
-- Displays usage information in the UI
-- Supports transaction-based database operations
+[MIT License](LICENSE)

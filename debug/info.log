@@ -1,0 +1,1424 @@
+[2025-08-20T21:36:07.601Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryPSc1x4nUqaZitGeW"
+}
+
+[2025-08-20T21:36:07.632Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "824b9ebc"
+}
+
+[2025-08-20T21:36:07.636Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "824b9ebc"
+}
+
+[2025-08-20T21:36:08.000Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "824b9ebc"
+}
+
+[2025-08-20T21:36:08.020Z] [pdf-renderer] Rendering PDF using playwright engine
+
+[2025-08-20T21:36:08.023Z] [pdf-renderer] Launching browser with explicit options
+
+[2025-08-20T21:36:08.068Z] [pdf-renderer] Rendering PDF using playwright engine
+
+[2025-08-20T21:36:08.075Z] [pdf-renderer] Rendering PDF using playwright engine
+
+[2025-08-20T21:39:39.485Z] PDF test route called
+
+[2025-08-20T21:39:39.487Z] Generating test PDF
+
+[2025-08-20T21:39:39.490Z] [pdf-renderer] Rendering PDF using playwright engine
+
+[2025-08-20T21:39:39.492Z] [pdf-renderer] Launching browser with explicit options
+
+[2025-08-20T21:39:39.532Z] PDF buffer generated, size: 353 bytes
+
+[2025-08-20T21:39:39.537Z] Test PDF saved to C:\Users\humza\resume_bot\debug\test-pdf-465be6ed.pdf
+
+[2025-08-20T21:40:29.614Z] PDF test route called
+
+[2025-08-20T21:40:29.617Z] Generating test PDF
+
+[2025-08-20T21:40:29.620Z] [pdf-renderer] Rendering PDF using playwright engine
+
+[2025-08-20T21:40:29.655Z] PDF buffer generated, size: 1104 bytes
+
+[2025-08-20T21:40:29.659Z] Test PDF saved to C:\Users\humza\resume_bot\debug\test-pdf-93fd0b72.pdf
+
+[2025-08-20T23:43:08.443Z] PDF test route called
+
+[2025-08-20T23:43:08.448Z] Generating test PDF
+
+[2025-08-20T23:43:08.450Z] [pdf-renderer] Rendering PDF using puppeteer engine
+
+[2025-08-20T23:43:08.452Z] Starting Puppeteer PDF generation
+
+[2025-08-20T23:43:08.470Z] PDF buffer generated, size: 430 bytes
+
+[2025-08-20T23:43:08.472Z] Test PDF saved to C:\Users\humza\resume_bot\debug\test-pdf-1651e76f.pdf
+
+[2025-08-20T23:51:17.017Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryoASkOMm3DAAJeJ7x"
+}
+
+[2025-08-20T23:51:17.052Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "2c39c8eb"
+}
+
+[2025-08-20T23:51:17.057Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "2c39c8eb"
+}
+
+[2025-08-20T23:51:17.353Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "2c39c8eb"
+}
+
+[2025-08-20T23:51:17.379Z] [pdf-renderer] Returning HTML directly as fallback
+
+[2025-08-20T23:51:17.382Z] [pdf-renderer] Returning HTML directly as fallback
+
+[2025-08-20T23:51:17.386Z] [pdf-renderer] Returning HTML directly as fallback
+
+[2025-08-21T00:38:03.300Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryUUaAM8nuHZZzFA0b"
+}
+
+[2025-08-21T00:38:03.337Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "4e3e42da"
+}
+
+[2025-08-21T00:38:03.342Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "4e3e42da"
+}
+
+[2025-08-21T00:38:03.664Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "4e3e42da"
+}
+
+[2025-08-21T00:38:03.700Z] [pdf-renderer] Generating PDF with Puppeteer
+
+[2025-08-21T00:38:03.705Z] Starting Puppeteer PDF generation
+
+[2025-08-21T00:38:06.629Z] [pdf-renderer] Generating PDF with Puppeteer
+
+[2025-08-21T00:38:06.631Z] Starting Puppeteer PDF generation
+
+[2025-08-21T00:38:07.485Z] [pdf-renderer] Generating PDF with Puppeteer
+
+[2025-08-21T00:38:07.487Z] Starting Puppeteer PDF generation
+
+[2025-08-21T00:51:39.152Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryh4utOyAnb9sBOQCs"
+}
+
+[2025-08-21T00:51:39.192Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "6718baee"
+}
+
+[2025-08-21T00:51:39.196Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "6718baee"
+}
+
+[2025-08-21T00:51:39.568Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "6718baee"
+}
+
+[2025-08-21T00:51:39.595Z] [pdf-renderer] Generating PDF using direct engine
+
+[2025-08-21T00:51:39.598Z] Generating PDF with html-pdf-node
+
+[2025-08-21T00:51:39.615Z] [pdf-renderer] Generating PDF using direct engine
+
+[2025-08-21T00:51:39.617Z] Generating PDF with html-pdf-node
+
+[2025-08-21T00:51:39.627Z] [pdf-renderer] Generating PDF using direct engine
+
+[2025-08-21T00:51:39.630Z] Generating PDF with html-pdf-node
+
+[2025-08-21T16:27:48.268Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryaNE3Ui2DibB6rueb"
+}
+
+[2025-08-21T16:27:48.304Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "d5712700"
+}
+
+[2025-08-21T16:27:48.309Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "d5712700"
+}
+
+[2025-08-21T16:27:48.648Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "d5712700"
+}
+
+[2025-08-21T16:27:48.661Z] Generating PDFs with React components
+{
+  "traceId": "d5712700"
+}
+
+[2025-08-21T16:27:48.692Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793668687.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:27:53.000Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryJGgrAeBb93JE2Yh6"
+}
+
+[2025-08-21T16:27:53.008Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "66c040d6"
+}
+
+[2025-08-21T16:27:53.011Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "66c040d6"
+}
+
+[2025-08-21T16:27:53.198Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "66c040d6"
+}
+
+[2025-08-21T16:27:53.207Z] Generating PDFs with React components
+{
+  "traceId": "66c040d6"
+}
+
+[2025-08-21T16:27:53.213Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793673210.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:27:58.577Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryaeXU2AjO6nc4uEaK"
+}
+
+[2025-08-21T16:27:58.580Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "325c5978"
+}
+
+[2025-08-21T16:27:58.581Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "325c5978"
+}
+
+[2025-08-21T16:27:58.714Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "325c5978"
+}
+
+[2025-08-21T16:27:58.722Z] Generating PDFs with React components
+{
+  "traceId": "325c5978"
+}
+
+[2025-08-21T16:27:58.727Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793678725.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:05.863Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryczs0NjBFOUZbA5FN"
+}
+
+[2025-08-21T16:28:05.872Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "5e88a21a"
+}
+
+[2025-08-21T16:28:05.874Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "5e88a21a"
+}
+
+[2025-08-21T16:28:06.108Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "5e88a21a"
+}
+
+[2025-08-21T16:28:06.117Z] Generating PDFs with React components
+{
+  "traceId": "5e88a21a"
+}
+
+[2025-08-21T16:28:06.122Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793686120.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:10.420Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarye4TlB37MeVihcAbu"
+}
+
+[2025-08-21T16:28:10.455Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "efa2106c"
+}
+
+[2025-08-21T16:28:10.459Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "efa2106c"
+}
+
+[2025-08-21T16:28:10.836Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "efa2106c"
+}
+
+[2025-08-21T16:28:10.850Z] Generating PDFs with React components
+{
+  "traceId": "efa2106c"
+}
+
+[2025-08-21T16:28:10.857Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793690853.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:14.944Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundary4ro0uRy9EbgXjhkN"
+}
+
+[2025-08-21T16:28:14.956Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "0d435fe8"
+}
+
+[2025-08-21T16:28:14.961Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "0d435fe8"
+}
+
+[2025-08-21T16:28:15.150Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "0d435fe8"
+}
+
+[2025-08-21T16:28:15.172Z] Generating PDFs with React components
+{
+  "traceId": "0d435fe8"
+}
+
+[2025-08-21T16:28:15.176Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793695174.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:20.161Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryf65w0Cf90AkTFM9j"
+}
+
+[2025-08-21T16:28:20.174Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "e69fdfd8"
+}
+
+[2025-08-21T16:28:20.177Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "e69fdfd8"
+}
+
+[2025-08-21T16:28:20.372Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "e69fdfd8"
+}
+
+[2025-08-21T16:28:20.382Z] Generating PDFs with React components
+{
+  "traceId": "e69fdfd8"
+}
+
+[2025-08-21T16:28:20.387Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793700386.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:27.535Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryRNMVXoAd4D4KGYGB"
+}
+
+[2025-08-21T16:28:27.544Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "1fe5ed38"
+}
+
+[2025-08-21T16:28:27.548Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "1fe5ed38"
+}
+
+[2025-08-21T16:28:27.728Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "1fe5ed38"
+}
+
+[2025-08-21T16:28:27.737Z] Generating PDFs with React components
+{
+  "traceId": "1fe5ed38"
+}
+
+[2025-08-21T16:28:27.740Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793707739.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:32.129Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryri13fuQQB0C4hXmN"
+}
+
+[2025-08-21T16:28:32.147Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "8824615b"
+}
+
+[2025-08-21T16:28:32.151Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "8824615b"
+}
+
+[2025-08-21T16:28:32.446Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "8824615b"
+}
+
+[2025-08-21T16:28:32.469Z] Generating PDFs with React components
+{
+  "traceId": "8824615b"
+}
+
+[2025-08-21T16:28:32.476Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793712473.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:36.589Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarypoS2ULV4lUdDoN2l"
+}
+
+[2025-08-21T16:28:36.592Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "073e1e34"
+}
+
+[2025-08-21T16:28:36.594Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "073e1e34"
+}
+
+[2025-08-21T16:28:36.703Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "073e1e34"
+}
+
+[2025-08-21T16:28:36.725Z] Generating PDFs with React components
+{
+  "traceId": "073e1e34"
+}
+
+[2025-08-21T16:28:36.729Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793716727.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:41.451Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryYa8xYnAs8oSsL8pE"
+}
+
+[2025-08-21T16:28:41.471Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "44c272cd"
+}
+
+[2025-08-21T16:28:41.477Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "44c272cd"
+}
+
+[2025-08-21T16:28:41.747Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "44c272cd"
+}
+
+[2025-08-21T16:28:41.761Z] Generating PDFs with React components
+{
+  "traceId": "44c272cd"
+}
+
+[2025-08-21T16:28:41.768Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793721765.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:28:48.837Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryDK9SH14YJnRZHkZz"
+}
+
+[2025-08-21T16:28:48.842Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "773df225"
+}
+
+[2025-08-21T16:28:48.846Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "773df225"
+}
+
+[2025-08-21T16:28:48.973Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "773df225"
+}
+
+[2025-08-21T16:28:48.980Z] Generating PDFs with React components
+{
+  "traceId": "773df225"
+}
+
+[2025-08-21T16:28:48.984Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755793728982.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:51:43.786Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryDsi7IAThzYXk6wps"
+}
+
+[2025-08-21T16:51:43.845Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "f133248a"
+}
+
+[2025-08-21T16:51:43.848Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "f133248a"
+}
+
+[2025-08-21T16:51:44.002Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "f133248a"
+}
+
+[2025-08-21T16:51:44.010Z] Generating PDFs with React components
+{
+  "traceId": "f133248a"
+}
+
+[2025-08-21T16:51:44.229Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795104225.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:51:48.700Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryS76LL326pcKMvwGn"
+}
+
+[2025-08-21T16:51:48.709Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "0f8aacc8"
+}
+
+[2025-08-21T16:51:48.712Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "0f8aacc8"
+}
+
+[2025-08-21T16:51:48.822Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "0f8aacc8"
+}
+
+[2025-08-21T16:51:48.827Z] Generating PDFs with React components
+{
+  "traceId": "0f8aacc8"
+}
+
+[2025-08-21T16:51:48.829Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795108828.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:51:53.512Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarycb9Lt3TFFZ8KVibI"
+}
+
+[2025-08-21T16:51:53.519Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "ffbcc939"
+}
+
+[2025-08-21T16:51:53.521Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "ffbcc939"
+}
+
+[2025-08-21T16:51:53.602Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "ffbcc939"
+}
+
+[2025-08-21T16:51:53.607Z] Generating PDFs with React components
+{
+  "traceId": "ffbcc939"
+}
+
+[2025-08-21T16:51:53.609Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795113608.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:53:40.554Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryTayJalXfMzgAiQ7t"
+}
+
+[2025-08-21T16:53:40.595Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "49d00dea"
+}
+
+[2025-08-21T16:53:40.599Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "49d00dea"
+}
+
+[2025-08-21T16:53:40.897Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "49d00dea"
+}
+
+[2025-08-21T16:53:40.907Z] Generating PDFs with React components
+{
+  "traceId": "49d00dea"
+}
+
+[2025-08-21T16:53:40.936Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795220931.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:53:45.261Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryk2OPIwd5JOpFt8Nn"
+}
+
+[2025-08-21T16:53:45.265Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "f731adb5"
+}
+
+[2025-08-21T16:53:45.266Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "f731adb5"
+}
+
+[2025-08-21T16:53:45.403Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "f731adb5"
+}
+
+[2025-08-21T16:53:45.411Z] Generating PDFs with React components
+{
+  "traceId": "f731adb5"
+}
+
+[2025-08-21T16:53:45.415Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795225413.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:53:50.087Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarybEIqlAllAV5FeXiV"
+}
+
+[2025-08-21T16:53:50.092Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "8a2ccea8"
+}
+
+[2025-08-21T16:53:50.093Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "8a2ccea8"
+}
+
+[2025-08-21T16:53:50.208Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "8a2ccea8"
+}
+
+[2025-08-21T16:53:50.218Z] Generating PDFs with React components
+{
+  "traceId": "8a2ccea8"
+}
+
+[2025-08-21T16:53:50.221Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795230220.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:53:56.946Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryLAnmhSG6B966RXsM"
+}
+
+[2025-08-21T16:53:56.949Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "5d61b916"
+}
+
+[2025-08-21T16:53:56.950Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "5d61b916"
+}
+
+[2025-08-21T16:53:57.026Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "5d61b916"
+}
+
+[2025-08-21T16:53:57.033Z] Generating PDFs with React components
+{
+  "traceId": "5d61b916"
+}
+
+[2025-08-21T16:53:57.038Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795237036.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:01.616Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarymTAbVz1oLDmUBFtU"
+}
+
+[2025-08-21T16:54:01.638Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "8e042db4"
+}
+
+[2025-08-21T16:54:01.641Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "8e042db4"
+}
+
+[2025-08-21T16:54:01.970Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "8e042db4"
+}
+
+[2025-08-21T16:54:01.982Z] Generating PDFs with React components
+{
+  "traceId": "8e042db4"
+}
+
+[2025-08-21T16:54:01.988Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795241984.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:05.863Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundary24QnwB5ZqoBvvYnT"
+}
+
+[2025-08-21T16:54:05.866Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "1a41de47"
+}
+
+[2025-08-21T16:54:05.868Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "1a41de47"
+}
+
+[2025-08-21T16:54:05.996Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "1a41de47"
+}
+
+[2025-08-21T16:54:06.005Z] Generating PDFs with React components
+{
+  "traceId": "1a41de47"
+}
+
+[2025-08-21T16:54:06.008Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795246007.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:10.994Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundary8HioilcMqZXENSd6"
+}
+
+[2025-08-21T16:54:10.999Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "5d069f5f"
+}
+
+[2025-08-21T16:54:11.001Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "5d069f5f"
+}
+
+[2025-08-21T16:54:11.128Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "5d069f5f"
+}
+
+[2025-08-21T16:54:11.136Z] Generating PDFs with React components
+{
+  "traceId": "5d069f5f"
+}
+
+[2025-08-21T16:54:11.142Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795251140.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:18.054Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryYHa9TUdpmJPbIolo"
+}
+
+[2025-08-21T16:54:18.058Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "88158cc8"
+}
+
+[2025-08-21T16:54:18.060Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "88158cc8"
+}
+
+[2025-08-21T16:54:18.201Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "88158cc8"
+}
+
+[2025-08-21T16:54:18.209Z] Generating PDFs with React components
+{
+  "traceId": "88158cc8"
+}
+
+[2025-08-21T16:54:18.214Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795258213.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:22.188Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryKRys4WzBvbxmTt0t"
+}
+
+[2025-08-21T16:54:22.199Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "e69f98a3"
+}
+
+[2025-08-21T16:54:22.202Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "e69f98a3"
+}
+
+[2025-08-21T16:54:22.432Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "e69f98a3"
+}
+
+[2025-08-21T16:54:22.438Z] Generating PDFs with React components
+{
+  "traceId": "e69f98a3"
+}
+
+[2025-08-21T16:54:22.443Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795262441.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:26.518Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryLdxwDqD20VrAukQB"
+}
+
+[2025-08-21T16:54:26.521Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "6e493289"
+}
+
+[2025-08-21T16:54:26.522Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "6e493289"
+}
+
+[2025-08-21T16:54:26.614Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "6e493289"
+}
+
+[2025-08-21T16:54:26.622Z] Generating PDFs with React components
+{
+  "traceId": "6e493289"
+}
+
+[2025-08-21T16:54:26.624Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795266623.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:31.427Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundarykou5MciIBe87o7Nm"
+}
+
+[2025-08-21T16:54:31.441Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "e29c5ebf"
+}
+
+[2025-08-21T16:54:31.444Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "e29c5ebf"
+}
+
+[2025-08-21T16:54:31.671Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "e29c5ebf"
+}
+
+[2025-08-21T16:54:31.680Z] Generating PDFs with React components
+{
+  "traceId": "e29c5ebf"
+}
+
+[2025-08-21T16:54:31.683Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795271682.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T16:54:38.434Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume-generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundary0kRxVHYWJlN1IBVy"
+}
+
+[2025-08-21T16:54:38.436Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "f75fed89"
+}
+
+[2025-08-21T16:54:38.438Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "f75fed89"
+}
+
+[2025-08-21T16:54:38.537Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "f75fed89"
+}
+
+[2025-08-21T16:54:38.542Z] Generating PDFs with React components
+{
+  "traceId": "f75fed89"
+}
+
+[2025-08-21T16:54:38.547Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795278545.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T17:03:32.662Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryjlAAC8emMqHvXkb2"
+}
+
+[2025-08-21T17:03:32.696Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "b2bfda14"
+}
+
+[2025-08-21T17:03:32.700Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "b2bfda14"
+}
+
+[2025-08-21T17:03:33.013Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "b2bfda14"
+}
+
+[2025-08-21T17:03:33.026Z] Generating PDFs with React components
+{
+  "traceId": "b2bfda14"
+}
+
+[2025-08-21T17:03:33.059Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755795813053.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T17:03:37.125Z] [server-renderer] PDF saved to /resumes/applicant_name_resume_1755795813053.pdf
+
+[2025-08-21T17:03:37.128Z] [server-renderer] PDF generated successfully, size: 14008 bytes
+
+[2025-08-21T17:03:37.133Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Cover Letter",
+    "fileName": "applicant_name_cover_letter_1755795813053.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T17:03:38.510Z] [server-renderer] PDF saved to /resumes/applicant_name_cover_letter_1755795813053.pdf
+
+[2025-08-21T17:03:38.514Z] [server-renderer] PDF generated successfully, size: 14014 bytes
+
+[2025-08-21T17:03:38.517Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "ATS Report - Applicant Name",
+    "fileName": "applicant_name_ats_report_1755795813053.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T17:03:39.825Z] [server-renderer] PDF saved to /resumes/applicant_name_ats_report_1755795813053.pdf
+
+[2025-08-21T17:03:39.829Z] [server-renderer] PDF generated successfully, size: 14012 bytes
+
+[2025-08-21T18:23:48.567Z] Resume generation request received
+{
+  "url": "http://localhost:3000/api/resume/generate",
+  "contentType": "multipart/form-data; boundary=----WebKitFormBoundaryMqclB3eWBASNOJHa"
+}
+
+[2025-08-21T18:23:48.655Z] Processing uploaded file
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileType": "application/pdf",
+  "traceId": "17814258"
+}
+
+[2025-08-21T18:23:48.659Z] File processed successfully
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "sizeBytes": 128376,
+  "traceId": "17814258"
+}
+
+[2025-08-21T18:23:48.875Z] PDF parsed successfully
+{
+  "textLength": 4039,
+  "traceId": "17814258"
+}
+
+[2025-08-21T18:23:48.886Z] Generating PDFs with React components
+{
+  "traceId": "17814258"
+}
+
+[2025-08-21T18:23:48.917Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Resume",
+    "fileName": "applicant_name_resume_1755800628912.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T18:23:52.088Z] [server-renderer] PDF saved to /resumes/applicant_name_resume_1755800628912.pdf
+
+[2025-08-21T18:23:52.093Z] [server-renderer] PDF generated successfully, size: 14008 bytes
+
+[2025-08-21T18:23:52.100Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "Applicant Name - Cover Letter",
+    "fileName": "applicant_name_cover_letter_1755800628912.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T18:23:53.343Z] [server-renderer] PDF saved to /resumes/applicant_name_cover_letter_1755800628912.pdf
+
+[2025-08-21T18:23:53.345Z] [server-renderer] PDF generated successfully, size: 14014 bytes
+
+[2025-08-21T18:23:53.347Z] [server-renderer] Generating PDF from HTML
+{
+  "options": {
+    "title": "ATS Report - Applicant Name",
+    "fileName": "applicant_name_ats_report_1755800628912.pdf",
+    "saveToPath": true
+  }
+}
+
+[2025-08-21T18:23:54.548Z] [server-renderer] PDF saved to /resumes/applicant_name_ats_report_1755800628912.pdf
+
+[2025-08-21T18:23:54.549Z] [server-renderer] PDF generated successfully, size: 14012 bytes
+
+[2025-08-22T22:25:51.896Z] [rewrite-resume-api] Processing resume
+{
+  "fileName": "resume july 2025 v0.pdf",
+  "fileSize": 128376
+}
+
+[2025-08-22T22:25:51.901Z] [resume-processor] Starting resume processing
+{
+  "filePath": "C:\\Users\\humza\\resume_bot\\apps\\web\\tmp\\resume july 2025 v0.pdf"
+}
+
+[2025-08-22T22:25:52.211Z] [resume-processor] Text extracted successfully
+{
+  "length": 4039
+}
+
+[2025-08-22T22:26:20.456Z] [resume-processor] Content rewritten successfully
+
+[2025-08-22T22:26:20.603Z] [resume-processor] DOCX created successfully
+{
+  "path": "C:\\Users\\humza\\resume_bot\\apps\\web\\tmp\\resume_1755901580458.docx"
+}
+
+[2025-08-22T22:26:25.496Z] [resume-processor] PDF created successfully
+{
+  "path": "C:\\Users\\humza\\resume_bot\\apps\\web\\tmp\\resume_1755901580458.pdf"
+}
+
