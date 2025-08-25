@@ -1,3 +1,17 @@
+## Security
+
+- Keep secrets only in `.env.local`. Never commit real keys or tokens.
+- Validate credentials with Secretlint:
+
+```bash
+npm run secretlint
+```
+
+- If a secret was committed, rotate it immediately and consider repository cleanup using BFG Repo-Cleaner:
+  1. Create a fresh mirror clone
+  2. Run BFG to replace/delete leaked values
+  3. Force push and rotate secrets
+
 # Resume Bot
 
 A web application that helps users generate tailored resumes, cover letters, and ATS reports based on their existing resume and job descriptions.

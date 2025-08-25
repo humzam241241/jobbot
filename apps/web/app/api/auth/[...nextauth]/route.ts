@@ -45,8 +45,9 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          prompt: "select_account consent",
+          scope: "openid email profile https://www.googleapis.com/auth/drive.readonly",
           access_type: "offline",
+          prompt: "consent",
           response_type: "code"
         }
       }
@@ -107,6 +108,9 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider) {
         token.provider = account.provider;
       }
+      if (account?.access_token) {
+        (token as any).accessToken = account.access_token as string;
+      }
       return token;
     },
     async session({ session, token }) {
@@ -115,6 +119,8 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
         session.provider = token.provider;
       }
+      // expose access token for Google Picker
+      (session as any).accessToken = (token as any).accessToken as string | undefined;
       return session;
     },
     async signIn({ user, account, profile, email }) {

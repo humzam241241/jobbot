@@ -25,6 +25,7 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+*.env
 .env.development
 .env.production
 
@@ -45,3 +46,13 @@ temp/
 
 # LibreOffice lock files
 .~lock.*
+
+# Ignore generated files
+apps/web/public/resumes/*
+apps/web/debug/*
+debug/*
+apps/web/prisma/dev.db
+apps/web/playwright-report/*
+apps/web/test-results/*
+apps/web/test/*
+test/*

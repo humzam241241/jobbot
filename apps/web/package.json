@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "secretlint": "secretlint \"**/*\" -i node_modules -i .next -i .git -i dist -i .env -i .env.local -i *.env"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -33,6 +34,8 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "prisma": "^5.10.0"
+    "prisma": "^5.10.0",
+    "@secretlint/secretlint": "^8.2.4",
+    "@secretlint/secretlint-rule-preset-recommend": "^8.2.4"
   }
 }
