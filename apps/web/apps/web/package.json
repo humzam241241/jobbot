@@ -1,0 +1,8 @@
+{
+	"dependencies": {
+		"clsx": "^2.1.0",
+		"googleapis": "^133.0.0",
+		"react-google-picker": "^0.1.0",
+		"tailwind-merge": "^2.2.1"
+	}
+}
