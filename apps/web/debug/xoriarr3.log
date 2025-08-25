@@ -1,3 +1,0 @@
-{"ts":"2025-08-21T19:26:08.032Z","traceId":"xoriarr3","component":"pipeline","level":"info","message":"start","data":{"fileName":"resume july 2025 v0.pdf"}}
-{"ts":"2025-08-21T19:26:08.280Z","traceId":"xoriarr3","component":"pipeline","level":"info","message":"parsed","data":{"sections":7}}
-{"ts":"2025-08-21T19:26:45.141Z","traceId":"xoriarr3","component":"pipeline","level":"info","message":"tailored_ok","data":{}}
