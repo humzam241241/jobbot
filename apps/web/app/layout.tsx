@@ -1,10 +1,9 @@
-import { Toaster } from 'react-hot-toast';
-import { Providers } from './providers';
+import { Providers } from '@/components/providers';
 import './globals.css';
 
 export const metadata = {
   title: 'JobBot - AI Resume Assistant',
-  description: 'Tailor your resume to job descriptions with AI',
+  description: 'Your AI-powered resume and job application assistant',
 };
 
 export default function RootLayout({
@@ -14,10 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-sans">
+      <body>
         <Providers>
           {children}
-          <Toaster position="top-right" />
         </Providers>
       </body>
     </html>

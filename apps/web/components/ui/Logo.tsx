@@ -1,24 +1,30 @@
+'use client';
+
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
 interface LogoProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
-const sizeClasses = {
-  xs: 'h-8 w-8',
-  sm: 'h-10 w-10', // Increased from h-8 w-8 to match text height
+const sizes = {
+  sm: 'h-8 w-8',
   md: 'h-12 w-12',
-  lg: 'h-16 w-16',
-  xl: 'h-20 w-20'
+  lg: 'h-24 w-24'
 };
 
-export function Logo({ size = 'md', className = '' }: LogoProps) {
+function cn(...inputs: (string | undefined)[]) {
+  return twMerge(clsx(inputs));
+}
+
+export function Logo({ size = 'md', className }: LogoProps) {
   return (
-    <div className={`relative flex items-center ${sizeClasses[size]} ${className}`}>
+    <div className={cn('relative', sizes[size], className)}>
       <img
-        src="/jobbot logo .png"
+        src="/logo.png"
         alt="JobBot"
-        className="h-full w-full object-contain"
-        style={{ imageRendering: 'crisp-edges' }} // Added for better image quality
+        className="w-full h-full object-contain"
       />
     </div>
   );

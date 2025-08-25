@@ -1,25 +1,21 @@
 'use client';
 
-import { signOut } from 'next-auth/react';
-import { Logo } from '@/components/ui/Logo';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 import { 
   Home, 
   FileText, 
   Briefcase, 
   Search, 
   BookOpen, 
-  Settings 
+  Settings,
+  LogOut 
 } from 'lucide-react';
+import Link from 'next/link';
+import { signOut } from 'next-auth/react';
+import { Logo } from '@/components/ui/Logo';
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<any>;
-  isReady?: boolean;
-}
-
-const navItems: NavItem[] = [
+const navItems = [
   {
     href: '/dashboard',
     label: 'Dashboard',
@@ -64,64 +60,61 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { credits } = useAuth();
 
-  const handleNavigation = (href: string, isReady: boolean) => {
-    if (isReady) {
-      router.push(href);
-    } else {
-      router.push('/coming-soon');
-    }
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/login' });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            {/* Left section with logo */}
-            <div className="flex-shrink-0 flex items-center">
-              <Logo size="sm" className="h-10 w-10" /> {/* Increased from h-8 w-8 to h-10 w-10 */}
+          <div className="flex h-16 items-center justify-between px-4">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Logo size="sm" className="h-8 w-8" />
             </div>
 
-            {/* Center section with navigation */}
-            <nav className="flex-1 flex justify-center space-x-2 px-4"> {/* Increased space-x-1 to space-x-2 */}
+            {/* Navigation */}
+            <nav className="flex space-x-4">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 
                 return (
-                  <button
+                  <Link
                     key={item.href}
-                    onClick={() => handleNavigation(item.href, item.isReady)}
-                    className={`flex items-center px-3 py-2 rounded-md transition-all text-sm
-                      ${isActive 
+                    href={item.isReady ? item.href : '#'}
+                    className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
+                      isActive 
                         ? 'bg-[#00E5A0]/10 text-[#00E5A0]' 
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}
-                      ${!item.isReady && 'opacity-75'}
-                    `}
+                        : 'text-gray-600 hover:bg-gray-100'
+                    } ${!item.isReady && 'opacity-50 cursor-not-allowed'}`}
                   >
                     <Icon className="h-4 w-4 mr-2" />
                     <span>{item.label}</span>
                     {!item.isReady && (
-                      <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                      <span className="ml-2 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full">
                         Soon
                       </span>
                     )}
-                  </button>
+                  </Link>
                 );
               })}
             </nav>
 
-            {/* Right section with credits and sign out */}
-            <div className="flex-shrink-0 flex items-center space-x-4">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                Credits: <span className="font-medium">30/30</span>
+            {/* Right section */}
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Credits: <span className="font-medium">{credits}/30</span>
               </span>
               <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-[#4F46E5] rounded-md hover:bg-[#4F46E5]/90 transition-colors"
+                onClick={handleSignOut}
+                className="flex items-center px-3 py-2 text-sm text-white bg-[#4F46E5] rounded-md hover:bg-[#4F46E5]/90 transition-colors"
               >
+                <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </button>
             </div>
@@ -129,7 +122,8 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      <main className="py-6">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 px-4">
         {children}
       </main>
     </div>

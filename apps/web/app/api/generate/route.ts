@@ -1,43 +1,66 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { createKitDirectory, saveUploadedFile, convertGoogleDoc, processDocxFile } from '@/lib/pipeline';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import debugLogger from '@/lib/utils/debug-logger';
 
-// Force dynamic rendering and disable caching
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-export const revalidate = 0;
-
-// Simple GET handler for debugging
-export async function GET(req: NextRequest) {
-  return NextResponse.json({
-    message: "This endpoint is deprecated. Please use /api/resume/generate instead.",
-    redirected: true,
-    timestamp: new Date().toISOString(),
-  }, { status: 200 });
-}
-
-// Direct handler - import the actual route handler
 export async function POST(req: NextRequest) {
-  console.log("[DEBUG] Handling /api/generate directly");
-  
   try {
-    // Import the handler from the canonical endpoint
-    const handler = await import('../resume/generate/route');
-    
-    // Call the handler directly with the request
-    console.log("[DEBUG] Calling handler directly from /api/generate");
-    return handler.POST(req);
-  } catch (error) {
-    console.error("[DEBUG] Error handling request:", error);
-    
-    // If handling fails, return an error
-    return NextResponse.json({
-      ok: false,
-      error: "Failed to process request",
-      message: "An error occurred while processing your request.",
-      details: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-    }, { 
-      status: 500,
-      headers: { "Cache-Control": "no-store, max-age=0" }
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Parse form data
+    const formData = await req.formData();
+    const jobDescription = formData.get('jobDescription') as string;
+    const provider = formData.get('provider') as string;
+    const model = formData.get('model') as string;
+
+    if (!jobDescription) {
+      return NextResponse.json({ error: 'Job description is required' }, { status: 400 });
+    }
+
+    // Create unique kit directory
+    const kitId = await createKitDirectory();
+
+    // Handle different input types
+    let docxPath: string;
+
+    const file = formData.get('file') as File;
+    const docUrl = formData.get('docUrl') as string;
+    const gdocId = formData.get('gdocId') as string;
+
+    if (file) {
+      // Handle file upload
+      docxPath = await saveUploadedFile(kitId, file);
+    } else if (gdocId) {
+      // Handle Google Doc
+      docxPath = await convertGoogleDoc(kitId, gdocId);
+    } else if (docUrl) {
+      // Handle URL
+      docxPath = await saveUploadedFile(kitId, await fetch(docUrl).then(r => r.blob()));
+    } else {
+      return NextResponse.json({ error: 'No document provided' }, { status: 400 });
+    }
+
+    // Process the document
+    const result = await processDocxFile(kitId, docxPath, jobDescription, {
+      provider,
+      model
     });
+
+    return NextResponse.json({
+      kitId,
+      ...result
+    });
+
+  } catch (error) {
+    debugLogger.error('Generation error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'An error occurred' },
+      { status: 500 }
+    );
   }
 }
