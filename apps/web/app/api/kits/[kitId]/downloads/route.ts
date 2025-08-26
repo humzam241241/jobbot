@@ -59,15 +59,33 @@ export async function GET(
     }
     
     // Otherwise, list available files
-    const dir = kitDir(params.kitId);
-    let files;
+    let dir = kitDir(params.kitId);
+    let files: string[] = [];
     
     try {
       files = await fs.readdir(dir);
     } catch {
-      files = [];
+      // Fallback to the uploads/<kitId> directory used by the generator
+      try {
+        const alt = path.join(process.cwd(), 'uploads', params.kitId);
+        files = await fs.readdir(alt);
+        dir = alt;
+      } catch {
+        files = [];
+      }
     }
     
+    // If a manifest exists, prefer it
+    try {
+      const manifest = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8');
+      const parsed = JSON.parse(manifest);
+      if (parsed?.files && Array.isArray(parsed.files)) {
+        const fileStatus: Record<string, boolean> = {};
+        for (const f of parsed.files) fileStatus[f] = files.includes(f);
+        return NextResponse.json({ success: true, data: { files: fileStatus } });
+      }
+    } catch {}
+
     // Check for specific files
     const fileChecks = [
       'resume_tailored.docx',
@@ -79,7 +97,7 @@ export async function GET(
       'input.docx'
     ];
     
-    const fileStatus = {};
+    const fileStatus: Record<string, boolean> = {};
     
     for (const file of fileChecks) {
       fileStatus[file] = files.includes(file);

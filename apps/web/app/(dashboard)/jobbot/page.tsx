@@ -1,11 +1,14 @@
 'use client';
 
+import type React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileText, Upload, Loader2, Cloud, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useSession, signIn } from 'next-auth/react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toast } from 'react-hot-toast';
+import { openGoogleDrivePicker } from '@/lib/google/picker';
 
 // Define window.gapi and window.google types
 declare global {
@@ -35,6 +38,7 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const GOOGLE_APP_ID = process.env.NEXT_PUBLIC_GOOGLE_APP_ID;
 
 function JobBotContent() {
+  const router = useRouter();
   const [inputType, setInputType] = useState<InputType>('file');
   const [jobDescription, setJobDescription] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -60,65 +64,21 @@ function JobBotContent() {
     }
   }, []);
 
-  // Load Google APIs
+  // Minimal readiness flags for UI diagnostics (picker loader handles scripts internally)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    console.log('Loading Google APIs...');
-    setDebugMessage('Loading Google APIs...');
-
-    // Load GAPI
-    if (!window.gapi) {
-      window.onGoogleApiLoad = () => {
-        console.log('GAPI script loaded. Loading picker module...');
-        window.gapi.load('picker', {
-          callback: () => {
-            setGapiLoaded(true);
-            console.log('GAPI picker module loaded.');
-            setDebugMessage('GAPI picker module loaded.');
-          },
-        });
-      };
-      const gapiScript = document.createElement('script');
-      gapiScript.src = 'https://apis.google.com/js/api.js?onload=onGoogleApiLoad';
-      gapiScript.async = true;
-      gapiScript.defer = true;
-      document.head.appendChild(gapiScript);
-    } else if (window.gapi.picker) {
-      setGapiLoaded(true);
-      console.log('GAPI already loaded.');
-      setDebugMessage('GAPI already loaded.');
-    }
-
-    // Load GIS
-    if (!window.google?.accounts?.oauth2) {
-      window.onGisLoad = () => {
-        setGisLoaded(true);
-        console.log('GIS script loaded.');
-        setDebugMessage('GIS script loaded.');
-      };
-      const gisScript = document.createElement('script');
-      gisScript.src = `https://accounts.google.com/gsi/client`;
-      gisScript.async = true;
-      gisScript.defer = true;
-      gisScript.onload = window.onGisLoad;
-      document.head.appendChild(gisScript);
-    } else if (window.google?.accounts?.oauth2) {
-      setGisLoaded(true);
-      console.log('GIS already loaded.');
-      setDebugMessage('GIS already loaded.');
-    }
-
-    return () => {
-      // Cleanup scripts if they were added by this component
-      const gapiScript = document.querySelector('script[src*="apis.google.com/js/api.js"]');
-      if (gapiScript) document.head.removeChild(gapiScript);
-      const gisScript = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
-      if (gisScript) document.head.removeChild(gisScript);
-      delete window.onGoogleApiLoad;
-      delete window.onGisLoad;
-    };
+    setGapiLoaded(true);
+    setGisLoaded(true);
   }, []);
+
+  // After returning from Google sign-in, auto-open the picker once
+  useEffect(() => {
+    const shouldOpen = typeof window !== 'undefined' && localStorage.getItem('openPickerAfterLogin') === '1';
+    if (shouldOpen && session?.accessToken && gapiLoaded && gisLoaded) {
+      localStorage.removeItem('openPickerAfterLogin');
+      // Fire the picker automatically
+      handleGoogleDriveSelect().catch(() => {});
+    }
+  }, [session?.accessToken, gapiLoaded, gisLoaded]);
 
   const createKit = useCallback(async () => {
     console.log('Creating kit...');
@@ -162,9 +122,9 @@ function JobBotContent() {
     }
 
     // Check if API key and client ID are available
-    if (!GOOGLE_API_KEY || !GOOGLE_CLIENT_ID || !GOOGLE_APP_ID) {
-      toast.error('Google API credentials not configured. Please check your environment variables.');
-      setDebugMessage('Missing Google API credentials in environment variables.');
+    if (!GOOGLE_API_KEY) {
+      toast.error('Missing Google API key (NEXT_PUBLIC_GOOGLE_API_KEY)');
+      setDebugMessage('Missing Google API key in environment variables.');
       return;
     }
 
@@ -175,58 +135,24 @@ function JobBotContent() {
       if (!session?.accessToken) {
         console.log('No access token found. Initiating Google sign-in.');
         setDebugMessage('No access token found. Please sign in with Google.');
-        
-        // Force a sign-in with consent to ensure Drive scope is granted
-        await signIn('google', { 
-          redirect: false, 
-          prompt: 'consent',
-          callbackUrl: window.location.href
-        });
-        
-        toast.info('Please sign in with Google and grant Drive access.');
-        setIsPickerLoading(false);
+        // Set a flag so we know to open the picker upon returning
+        try { localStorage.setItem('openPickerAfterLogin', '1'); } catch {}
+        await signIn('google', { redirect: true, prompt: 'consent', callbackUrl: '/jobbot' });
         return;
       }
 
-      console.log('Creating Google Picker...');
-      setDebugMessage('Creating Google Picker...');
-      
-      // Create the Google Picker
-      const google = window.google;
-      const gapi = window.gapi;
-      
-      if (!google || !gapi || !gapi.picker) {
-        throw new Error('Google APIs not fully loaded');
-      }
-      
-      const docsView = new gapi.picker.DocsView()
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(false)
-        .setMimeTypes('application/vnd.google-apps.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      
-      const picker = new gapi.picker.PickerBuilder()
-        .addView(docsView)
-        .setOAuthToken(session.accessToken as string)
-        .setDeveloperKey(GOOGLE_API_KEY)
-        .setAppId(GOOGLE_APP_ID)
-        .setCallback(async (data: any) => {
-          if (data.action === 'picked') {
-            const file = data.docs[0];
-            console.log('File picked:', file);
-            setDebugMessage(`Selected file: ${file.name} (${file.id})`);
-            
-            // Handle the selected file
-            await handleGoogleDriveFileDownload(file.id, file.name, session.accessToken as string);
-          } else if (data.action === 'cancel') {
-            console.log('Picker closed without selection');
-            setDebugMessage('Picker closed without selection');
-          }
-        })
-        .build();
-      
-      picker.setVisible(true);
-      console.log('Picker opened');
-      setDebugMessage('Picker opened');
+      console.log('Opening Google Picker via helper...');
+      setDebugMessage('Opening Google Picker via helper...');
+
+      await openGoogleDrivePicker({
+        accessToken: session.accessToken as string,
+        developerKey: GOOGLE_API_KEY,
+        appId: GOOGLE_APP_ID,
+        onPicked: async (file) => {
+          setDebugMessage(`Selected file: ${file.name} (${file.id}) [${file.mimeType || 'unknown'}]`);
+          await handleGoogleDriveFileDownload(file.id, file.name || 'document', file.mimeType || '', session.accessToken as string);
+        }
+      });
       
     } catch (error: any) {
       console.error('Google Picker error:', error);
@@ -237,17 +163,19 @@ function JobBotContent() {
     }
   }, [gapiLoaded, gisLoaded, session, GOOGLE_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_APP_ID]);
 
-  const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, accessToken: string) => {
+  const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, mimeType: string, accessToken: string) => {
     setIsLoading(true);
     toast.loading('Downloading file from Google Drive...');
     setDebugMessage(`Downloading file ${fileName} from Google Drive...`);
 
     try {
-      // For Google Docs, we need to export it as DOCX
-      const isGoogleDoc = fileName.endsWith('.gdoc') || fileName.includes('document');
+      // Decide endpoint based on real mimeType from Picker
+      const isGoogleDoc = mimeType === 'application/vnd.google-apps.document';
       const url = isGoogleDoc
         ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`
         : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+
+      setDebugMessage(`Fetching from Drive: ${isGoogleDoc ? 'export (Google Doc → DOCX)' : 'download (binary)'}\nURL: ${url}`);
 
       const downloadResponse = await fetch(url, {
         headers: {
@@ -256,12 +184,27 @@ function JobBotContent() {
       });
 
       if (!downloadResponse.ok) {
-        const errorText = await downloadResponse.text();
-        throw new Error(`Failed to download file from Google Drive: ${downloadResponse.status} ${downloadResponse.statusText} - ${errorText}`);
+        const text = await downloadResponse.text();
+        let suggestion = 'Check that the selected file is accessible and that Drive scope is granted.';
+        try {
+          const j = JSON.parse(text);
+          const msg = j?.error?.message || j?.message;
+          const reason = j?.error?.errors?.[0]?.reason;
+          if (reason === 'fileNotDownloadable') {
+            suggestion = 'This is a Google Doc. Use export endpoint. I already did; if it still fails, ensure the file is not a shortcut and you have viewer access.';
+          } else if (reason === 'cannotDownloadFile') {
+            suggestion = 'File cannot be downloaded. Try making a copy in Drive and selecting the copy.';
+          } else if (downloadResponse.status === 403) {
+            suggestion = 'Forbidden. Ensure the Google account used for sign-in has access to this file.';
+          }
+          throw new Error(`Drive error ${downloadResponse.status}: ${msg || downloadResponse.statusText}. Reason=${reason || 'n/a'}. ${suggestion}`);
+        } catch {
+          throw new Error(`Drive error ${downloadResponse.status}: ${downloadResponse.statusText}. ${suggestion}. Raw=${text.slice(0, 300)}`);
+        }
       }
 
       const blob = await downloadResponse.blob();
-      const docxName = fileName.endsWith('.docx') ? fileName : `${fileName}.docx`;
+      const docxName = fileName.toLowerCase().endsWith('.docx') ? fileName : `${fileName}.docx`;
       const downloadedFile = new File([blob], docxName, { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
@@ -296,7 +239,7 @@ function JobBotContent() {
 
     } catch (error: any) {
       toast.dismiss();
-      toast.error(error.message || 'An unexpected error occurred');
+      toast.error(error.message || 'Could not download or import the file from Google Drive.');
       console.error('Google Drive file processing error:', error);
       setDebugMessage(`Error: ${error.message}`);
     } finally {
@@ -369,6 +312,9 @@ function JobBotContent() {
       decrementCredits();
       toast.dismiss();
       toast.success('Resume kit generated successfully!');
+
+      // Redirect to results page so user can download outputs
+      router.push(`/kits/${currentKitId}/results`);
 
     } catch (err) {
       toast.dismiss();

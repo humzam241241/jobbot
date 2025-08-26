@@ -16,7 +16,8 @@ export async function GET(
     }
 
     const { kitId, filename } = params;
-    const filePath = path.join(process.cwd(), 'storage', 'kits', kitId, filename);
+    // Align with generator output path
+    const filePath = path.join(process.cwd(), 'uploads', kitId, filename);
 
     const fileBuffer = await readFile(filePath);
     const contentType = filename.endsWith('.pdf')

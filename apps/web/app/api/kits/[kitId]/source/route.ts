@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
 import fs from "fs/promises";
 import path from "path";
 
 function kitDir(kitId: string) {
-  return path.join(process.cwd(), 'public', 'kits', kitId);
+  // Align with generator output directory
+  return path.join(process.cwd(), 'uploads', kitId);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { kitId: string }}) {
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { kitId: stri
     const { type, fileId, accessToken } = await req.json();
     
     if (type === "gdoc" && fileId) {
-      console.log('Processing Google Doc:', fileId);
+      console.log('Processing Google Doc via REST export:', fileId);
       try {
         if (!accessToken) {
           console.error('No access token provided');
@@ -27,20 +27,19 @@ export async function POST(req: NextRequest, { params }: { params: { kitId: stri
           );
         }
 
-        console.log('Using access token to export Google Doc');
-        const oauth2 = new google.auth.OAuth2();
-        oauth2.setCredentials({ access_token: accessToken });
-        const drive = google.drive({ version: "v3", auth: oauth2 });
+        const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`;
+        const resp = await fetch(exportUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`Drive export failed: ${resp.status} ${resp.statusText} - ${text}`);
+        }
+        const arrayBuf = await resp.arrayBuffer();
 
-        const res = await drive.files.export(
-          { fileId, mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-          { responseType: "arraybuffer" }
-        );
-
-        console.log('Google Doc exported successfully');
         await fs.mkdir(dir, { recursive: true });
-        const out = path.join(dir, "input.docx");
-        await fs.writeFile(out, Buffer.from(res.data as ArrayBuffer));
+        const out = path.join(dir, "source.docx");
+        await fs.writeFile(out, Buffer.from(arrayBuf));
         console.log('Saved to', out);
         return NextResponse.json({ ok: true, kind: "gdoc->docx" });
       } catch (e: any) {
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { kitId: stri
   }
   await fs.mkdir(dir, { recursive: true });
   const array = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(path.join(dir, "input.docx"), array);
+  await fs.writeFile(path.join(dir, "source.docx"), array);
   console.log('File uploaded successfully');
   return NextResponse.json({ ok: true, kind: "docx" });
 }

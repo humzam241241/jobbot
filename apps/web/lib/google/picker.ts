@@ -72,27 +72,37 @@ export async function openGoogleDrivePicker(options: PickerOptions): Promise<voi
   const google: any = window.google;
   if (!google?.picker) throw new Error("google.picker not available");
 
-  const docsView = new google.picker.DocsView()
+  // Two explicit tabs: Google Docs and Word (.docx). Also support shared drives.
+  const googleDocsView = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS)
+    .setIncludeFolders(false)
+    .setSelectFolderEnabled(false)
+    .setMimeTypes("application/vnd.google-apps.document");
+
+  const wordDocxView = new google.picker.DocsView(google.picker.ViewId.DOCS)
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false)
-    .setOwnedByMe(true)
-    .setMimeTypes(
-      "application/vnd.google-apps.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
+    .setMimeTypes("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
-  const picker = new google.picker.PickerBuilder()
+  let builder = new google.picker.PickerBuilder()
     .enableFeature(google.picker.Feature.NAV_HIDDEN)
-    .setAppId(appId)
+    .enableFeature(google.picker.Feature.SUPPORT_TEAM_DRIVES)
+    .setOrigin(`${window.location.protocol}//${window.location.host}`)
     .setOAuthToken(accessToken)
     .setDeveloperKey(developerKey)
-    .addView(docsView)
+    .addView(googleDocsView)
+    .addView(wordDocxView)
     .setCallback((data: any) => {
       if (data?.action === google.picker.Action.PICKED && Array.isArray(data.docs) && data.docs[0]) {
         const f = data.docs[0];
         onPicked({ id: f.id, name: f.name, mimeType: f.mimeType });
       }
-    })
-    .build();
+    });
+
+  if (appId && String(appId).trim().length > 0) {
+    builder = builder.setAppId(appId);
+  }
+
+  const picker = builder.build();
 
   picker.setVisible(true);
 }

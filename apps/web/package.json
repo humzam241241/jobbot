@@ -34,8 +34,6 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "prisma": "^5.10.0",
-    "@secretlint/secretlint": "^8.2.4",
-    "@secretlint/secretlint-rule-preset-recommend": "^8.2.4"
+    "prisma": "^5.10.0"
   }
 }
