@@ -1,3 +1,29 @@
+## Environment Configuration (no secrets)
+
+Create `apps/web/.env.local` (do not commit) using these placeholders:
+
+```
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=YOUR_RANDOM_BASE64_SECRET
+
+GOOGLE_CLIENT_ID=2448...apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_SECRET
+
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=2448...apps.googleusercontent.com
+NEXT_PUBLIC_GOOGLE_API_KEY=YOUR_PUBLIC_PICKER_KEY
+NEXT_PUBLIC_GOOGLE_APP_ID=YOUR_GOOGLE_PROJECT_NUMBER
+
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/db?sslmode=require
+REDIS_URL=rediss://default:PASSWORD@HOST:6379
+```
+
+### Safety checklist
+- Never commit `.env*` files (blocked in `.gitignore`).
+- Run `gitleaks detect --redact` locally before pushing.
+- Use GitHub secret scanning and CI workflow provided.
+- Rotate any leaked key immediately.
+
 # Gitleaks
 
 ```

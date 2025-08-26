@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running gitleaks secret scan on staged files..."
+gitleaks protect --staged --redact || {
+  echo "❌ Secret patterns detected. Fix before committing."
+  exit 1
+}
+
+npx lint-staged
+
+

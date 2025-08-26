@@ -1,3 +1,22 @@
+Environment configuration (local only)
+
+Create apps/web/.env.local with these keys (do not commit):
+
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate-a-long-random-string
+
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-rotated-secret
+
+# Optional: skip DB in development
+SKIP_DB=1
+
+Notes
+- Redirect URIs in Google Console must include:
+  - http://localhost:3000/api/auth/callback/google
+- After editing .env.local, fully restart the dev server.
+- Never share secrets or commit .env files.
+
 # Environment Configuration (Local Only)
 
 Follow these rules to keep secrets secure:

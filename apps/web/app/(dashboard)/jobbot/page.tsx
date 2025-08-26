@@ -9,6 +9,8 @@ import { useSession, signIn } from 'next-auth/react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toast } from 'react-hot-toast';
 import { openGoogleDrivePicker } from '@/lib/google/picker';
+import { GoogleDriveButton } from '@/components/BrowseDriveButton';
+import { logInfo, logError } from '@/lib/logger';
 
 // Define window.gapi and window.google types
 declare global {
@@ -333,7 +335,7 @@ function JobBotContent() {
       </p>
       
       {/* API Status Debug */}
-      <div className="mb-4 text-sm text-gray-700 flex justify-center gap-4">
+      <div className="mb-2 text-sm text-gray-700 flex justify-center gap-4">
         <div className="flex items-center">
           <span>GAPI:</span> 
           {gapiLoaded ? 
@@ -348,6 +350,26 @@ function JobBotContent() {
         </div>
         <div className="flex items-center">
           <span>Port:</span> <span className="ml-1">{port}</span>
+        </div>
+      </div>
+
+      {/* Drive Diagnostics */}
+      <div className="mb-4 text-xs text-gray-700 flex justify-center gap-4">
+        <div className="px-2 py-1 rounded border flex items-center">
+          <span>Drive token:</span>
+          {session?.accessToken ? (
+            <span className="ml-1 text-green-600">present</span>
+          ) : (
+            <span className="ml-1 text-red-600">missing</span>
+          )}
+        </div>
+        <div className="px-2 py-1 rounded border flex items-center">
+          <span>Picker key:</span>
+          {GOOGLE_API_KEY ? (
+            <span className="ml-1 text-green-600">configured</span>
+          ) : (
+            <span className="ml-1 text-red-600">missing</span>
+          )}
         </div>
       </div>
       
@@ -373,15 +395,19 @@ function JobBotContent() {
             Upload DOCX
           </button>
           
-          <button
-            type="button"
-            onClick={handleGoogleDriveSelect}
-            disabled={isPickerLoading || !gapiLoaded || !gisLoaded}
-            className="flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Cloud className="w-5 h-5 mr-2" />
-            {isPickerLoading ? 'Loading...' : 'Browse Google Drive'}
-          </button>
+          {/* Enhanced Google Drive Button with logging and error handling */}
+          <GoogleDriveButton
+            onFileSelect={async (fileId, fileName, mimeType) => {
+              logInfo('File selected from Google Drive in JobBot', { fileId, fileName, mimeType }, 'JobBot');
+              setInputType('gdrive');
+              try {
+                await handleGoogleDriveFileDownload(fileId, fileName, mimeType, session?.accessToken as string);
+              } catch (error) {
+                logError('Failed to process Google Drive file in JobBot', error, 'JobBot');
+              }
+            }}
+            className=""
+          />
           
           {/* Hidden file input for regular uploads */}
           <input

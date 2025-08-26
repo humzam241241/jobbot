@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { clientEnv } from "@/src/config/env";
 
 function useScript(src: string) {
   const [ready, setReady] = useState(false);
@@ -35,10 +36,10 @@ export type PickerResult = { fileId: string; name?: string; mimeType?: string } 
 export function useGooglePicker() {
   console.log('useGooglePicker hook initializing');
 
-  // Hardcoded values to ensure they're available
-  const apiKey = "AIzaSyDINt8kTkq7X-gYVODdDb-aLPZ4brp2O6I";
-  const clientId = "244828860370-g3ugmlq9hm1qbsnr2s4bsdf74v71t57k.apps.googleusercontent.com";
-  const appId = "244828860370";
+  // Read from public env vars; fail fast if missing
+  const apiKey = clientEnv.NEXT_PUBLIC_GOOGLE_API_KEY;
+  const clientId = clientEnv.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const appId = clientEnv.NEXT_PUBLIC_GOOGLE_APP_ID;
 
   const gapiReady = useScript("https://apis.google.com/js/api.js");
   const gisReady = useScript("https://accounts.google.com/gsi/client");
@@ -52,6 +53,10 @@ export function useGooglePicker() {
 
   const getDriveToken = useCallback(async (): Promise<string> => {
     console.log('Getting Drive token...');
+    
+    if (!clientId) {
+      throw new Error('Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID');
+    }
     
     if (!window.google?.accounts?.oauth2) {
       console.error('Google OAuth2 not available');
@@ -90,6 +95,13 @@ export function useGooglePicker() {
   const openPicker = useCallback(async (): Promise<PickerResult> => {
     console.log('Opening picker...', { gapiReady, gisReady });
     
+    if (!apiKey) {
+      throw new Error('Missing NEXT_PUBLIC_GOOGLE_API_KEY');
+    }
+    if (!appId) {
+      throw new Error('Missing NEXT_PUBLIC_GOOGLE_APP_ID');
+    }
+
     if (!gapiReady || !gisReady) {
       console.error('APIs not ready:', { gapiReady, gisReady });
       throw new Error("Google APIs not loaded yet");
@@ -127,7 +139,7 @@ export function useGooglePicker() {
       let resolve!: (v: PickerResult) => void;
       const pickedP = new Promise<PickerResult>((r) => (resolve = r));
 
-      console.log('Creating picker with:', { apiKey, appId });
+      console.log('Creating picker with:', { apiKeyTail: apiKey.slice(-4), appId });
       const picker = new window.google.picker.PickerBuilder()
         .setAppId(appId)
         .setDeveloperKey(apiKey)

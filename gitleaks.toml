@@ -1,0 +1,46 @@
+title = "Jobbot Secret Scanning"
+
+[[rules]]
+id = "openai-key"
+description = "OpenAI API key"
+regex = '''sk-(live|test|proj)[A-Za-z0-9_\-]{20,}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "anthropic-key"
+regex = '''sk-ant-[A-Za-z0-9_\-]{20,}'''
+
+[[rules]]
+id = "openrouter-key"
+regex = '''sk-or-v1-[A-Za-z0-9]{20,}'''
+
+[[rules]]
+id = "google-api"
+regex = '''AIza[0-9A-Za-z\-_]{15,}'''
+
+[[rules]]
+id = "google-oauth-secret"
+regex = '''GOCSPX-[0-9A-Za-z\-_]{10,}'''
+
+[[rules]]
+id = "postgres-url"
+regex = '''postgres(ql)?:\/\/[\S]+'''
+
+[[rules]]
+id = "redis-url"
+regex = '''rediss?:\/\/default:[^@]+@[\S]+'''
+
+[[rules]]
+id = "sentry-token"
+regex = '''sntryu_[0-9A-Za-z]+'''
+
+[[rules]]
+id = "nextauth-secret"
+regex = '''NEXTAUTH_SECRET\s*=\s*['"]?[A-Za-z0-9+\/=]{24,}'''
+
+[allowlist]
+paths = [
+  "gitleaks_.*",
+  "**/README.md",
+]
+

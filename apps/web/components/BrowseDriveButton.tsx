@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { openGoogleDrivePicker } from '@/lib/google/picker';
-import { Cloud, Loader2 } from 'lucide-react';
+import { Cloud, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { logInfo, logError, logGoogleDriveError } from '@/lib/logger';
 
 interface BrowseDriveButtonProps {
   onFileSelect: (fileId: string, fileName: string, mimeType: string) => void;
@@ -19,18 +20,57 @@ export function GoogleDriveButton({
   className = ''
 }: BrowseDriveButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const { data: session } = useSession();
-  const isLoading = false;
-  const error: string | null = null;
+  const [error, setError] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const isLoading = status === 'loading';
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+  const appId = process.env.NEXT_PUBLIC_GOOGLE_APP_ID;
   const hasToken = Boolean(session?.accessToken);
   const isDisabled = isProcessing || isLoading;
+
+  // Log component initialization
+  useEffect(() => {
+    logInfo('GoogleDriveButton initialized', {
+      hasApiKey: !!apiKey,
+      hasAppId: !!appId,
+      hasToken,
+      sessionStatus: status
+    }, 'GoogleDriveButton');
+  }, [apiKey, appId, hasToken, status]);
 
   const handleConnect = async () => {
     try {
       setIsProcessing(true);
-      await signIn('google', { callbackUrl: '/dashboard', redirect: true });
+      setError(null);
+      
+      logInfo('Starting Google Drive connection', { 
+        currentPath: window.location.pathname 
+      }, 'GoogleDriveButton');
+      
+      try { 
+        localStorage.setItem('openPickerAfterLogin', '1'); 
+      } catch (storageError) {
+        logError('Failed to set localStorage flag', storageError, 'GoogleDriveButton');
+      }
+      
+      const result = await signIn('google', { 
+        callbackUrl: window.location.pathname, 
+        redirect: true, 
+        prompt: 'consent' 
+      });
+      
+      if (!result) {
+        throw new Error('Sign-in was cancelled or failed');
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error during sign-in';
+      setError(`Failed to connect: ${errorMessage}`);
+      logGoogleDriveError('connect', error as Error, { 
+        currentPath: window.location.pathname 
+      });
+      toast.error(`Connection failed: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -39,32 +79,112 @@ export function GoogleDriveButton({
   const handleBrowse = async () => {
     try {
       setIsProcessing(true);
-      const keyTail = (apiKey || '').slice(-4);
-      const hasTokenFlag = Boolean(session?.accessToken);
-      console.log('Picker init key=', (process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '').slice(-4), 'token=', !!session?.accessToken);
+      setError(null);
+      
+      logInfo('Starting Google Drive browse', {
+        hasApiKey: !!apiKey,
+        hasAppId: !!appId,
+        hasToken: !!session?.accessToken,
+        tokenLength: session?.accessToken?.length || 0
+      }, 'GoogleDriveButton');
+
+      // Validate required environment variables
       if (!apiKey) {
-        toast.error('Google API key missing (NEXT_PUBLIC_GOOGLE_API_KEY)');
+        const errorMsg = 'Google API key missing (NEXT_PUBLIC_GOOGLE_API_KEY)';
+        setError(errorMsg);
+        logError(errorMsg, { envVars: { apiKey: !!apiKey, appId: !!appId } }, 'GoogleDriveButton');
+        toast.error(errorMsg);
         return;
       }
+
+      if (!appId) {
+        const errorMsg = 'Google App ID missing (NEXT_PUBLIC_GOOGLE_APP_ID)';
+        setError(errorMsg);
+        logError(errorMsg, { envVars: { apiKey: !!apiKey, appId: !!appId } }, 'GoogleDriveButton');
+        toast.error(errorMsg);
+        return;
+      }
+
       if (!session?.accessToken) {
-        toast.error('Sign in with Google to connect Drive');
-        return;
+        logInfo('No access token, redirecting to sign-in', {}, 'GoogleDriveButton');
+        try { 
+          localStorage.setItem('openPickerAfterLogin', '1'); 
+        } catch (storageError) {
+          logError('Failed to set localStorage flag', storageError, 'GoogleDriveButton');
+        }
+        await signIn('google', { 
+          callbackUrl: window.location.pathname, 
+          redirect: true, 
+          prompt: 'consent' 
+        });
+        return; 
       }
+
+      logInfo('Opening Google Drive picker', {
+        apiKeyLength: apiKey.length,
+        appId,
+        tokenLength: session.accessToken.length
+      }, 'GoogleDriveButton');
+
       await openGoogleDrivePicker({
         accessToken: session.accessToken,
         developerKey: apiKey,
-        appId: (process.env.NEXT_PUBLIC_GOOGLE_APP_ID || '0'),
+        appId: appId,
         onPicked: (file) => {
+          logInfo('File selected from Google Drive', {
+            fileId: file.id,
+            fileName: file.name,
+            mimeType: file.mimeType
+          }, 'GoogleDriveButton');
+          
           onFileSelect(file.id, file.name, file.mimeType || 'application/octet-stream');
-          toast.success(`Selected: ${file.name}`);
+          toast.success(`✅ Selected: ${file.name}`);
         }
       });
-    } catch (err) {
-      console.error('Error preparing Google Drive picker:', err);
-      toast.error('Failed to initialize Google Drive');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown picker error';
+      setError(`Picker failed: ${errorMessage}`);
+      logGoogleDriveError('browse', error as Error, {
+        hasApiKey: !!apiKey,
+        hasAppId: !!appId,
+        hasToken: !!session?.accessToken
+      });
+      toast.error(`❌ Failed to open Google Drive: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Auto-resume picker after returning from Google sign-in
+  useEffect(() => {
+    const shouldOpen = typeof window !== 'undefined' && localStorage.getItem('openPickerAfterLogin') === '1';
+    if (shouldOpen && session?.accessToken && !isProcessing) {
+      logInfo('Auto-resuming picker after login', {}, 'GoogleDriveButton');
+      try { 
+        localStorage.removeItem('openPickerAfterLogin'); 
+      } catch (storageError) {
+        logError('Failed to remove localStorage flag', storageError, 'GoogleDriveButton');
+      }
+      handleBrowse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.accessToken]);
+
+  const getButtonText = () => {
+    if (isLoading) return 'Loading...';
+    if (isProcessing) return hasToken ? 'Opening Drive...' : 'Connecting...';
+    return hasToken ? 'Browse Google Drive' : 'Connect Google Drive';
+  };
+
+  const getButtonIcon = () => {
+    if (isProcessing || isLoading) {
+      return <Loader2 className="w-5 h-5 mr-2 animate-spin" />;
+    }
+    if (error) {
+      return <AlertCircle className="w-5 h-5 mr-2" />;
+    }
+    return <Cloud className="w-5 h-5 mr-2" />;
   };
   
   return (
@@ -73,29 +193,56 @@ export function GoogleDriveButton({
         type="button"
         onClick={hasToken ? handleBrowse : handleConnect}
         disabled={isDisabled}
-        className={`flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        className={`flex items-center px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          error 
+            ? 'bg-red-600 hover:bg-red-700' 
+            : 'bg-blue-600 hover:bg-blue-700'
+        } ${className}`}
       >
-        {isProcessing || isLoading ? (
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-        ) : (
-          <Cloud className="w-5 h-5 mr-2" />
-        )}
-        {hasToken ? 'Browse Google Drive' : 'Connect Google Drive'}
+        {getButtonIcon()}
+        {getButtonText()}
       </button>
+      
       {error && (
-        <div className="mt-2 text-sm text-red-600">
-          {error.includes('API key') ? (
-            <div>
-              <p>Google Drive API key error. Please check:</p>
-              <ul className="list-disc list-inside mt-1">
-                <li>API key is set in environment variables</li>
-                <li>API key has correct referrer restrictions</li>
-                <li>Google Drive and Picker APIs are enabled</li>
-              </ul>
+        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="text-sm text-red-700">
+              {error.includes('API key') ? (
+                <div>
+                  <p className="font-medium mb-1">Google Drive API configuration error:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Check NEXT_PUBLIC_GOOGLE_API_KEY is set</li>
+                    <li>Verify API key has correct referrer restrictions</li>
+                    <li>Ensure Google Drive and Picker APIs are enabled</li>
+                    <li>Check NEXT_PUBLIC_GOOGLE_APP_ID is configured</li>
+                  </ul>
+                </div>
+              ) : (
+                <p>{error}</p>
+              )}
+              <button
+                onClick={() => {
+                  setError(null);
+                  logInfo('Error dismissed by user', { previousError: error }, 'GoogleDriveButton');
+                }}
+                className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+              >
+                Dismiss
+              </button>
             </div>
-          ) : (
-            error
-          )}
+          </div>
+        </div>
+      )}
+
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
+          <p>Debug Info:</p>
+          <p>• API Key: {apiKey ? '✓ Set' : '✗ Missing'}</p>
+          <p>• App ID: {appId ? '✓ Set' : '✗ Missing'}</p>
+          <p>• Token: {hasToken ? '✓ Available' : '✗ Missing'}</p>
+          <p>• Session: {status}</p>
         </div>
       )}
     </div>

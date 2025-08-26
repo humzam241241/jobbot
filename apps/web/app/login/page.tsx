@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Logo } from '@/components/ui/Logo';
+// import { Logo } from '@/components/ui/Logo'; // Not needed, using direct img tag
 import { Mail } from 'lucide-react';
 
 export default function LoginPage() {
@@ -18,46 +18,49 @@ export default function LoginPage() {
   // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/dashboard');
+      console.log('User already authenticated, redirecting to dashboard');
+      const targetUrl = searchParams?.get('from') || '/dashboard';
+      router.replace(targetUrl); // Use replace to avoid adding to history
     }
-  }, [status, router]);
+  }, [status, router, searchParams]);
 
-  // Clear any existing auth state on mount
+  // Debug logging
   useEffect(() => {
-    const clearAuth = async () => {
-      try {
-        localStorage.removeItem('next-auth.session-token');
-        localStorage.removeItem('next-auth.callback-url');
-        localStorage.removeItem('next-auth.csrf-token');
-        document.cookie.split(';').forEach(c => {
-          document.cookie = c
-            .replace(/^ +/, '')
-            .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
-        });
-      } catch (error) {
-        console.error('Error clearing auth state:', error);
-      }
-    };
-    clearAuth();
-  }, []);
+    console.log('Login page - Session status:', status);
+  }, [status]);
+
+  // Removed aggressive cookie clearing that could break NextAuth handshake
 
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
       const callbackUrl = searchParams?.get('from') || '/dashboard';
+      console.log('Starting Google sign-in with callback:', callbackUrl);
       
-      const result = await signIn('google', {
-        callbackUrl,
-        redirect: false,
+      const result = await signIn('google', { 
+        callbackUrl, 
+        redirect: false, // Don't auto-redirect, handle manually
+        prompt: 'consent',
+        // Request minimal scopes on initial sign-in to avoid OAuthCallback failures.
+        // Drive scopes are requested later only when needed by the Drive picker.
+        scope: 'openid email profile',
+        access_type: 'offline',
+        response_type: 'code'
       });
-
+      
+      console.log('Google sign-in result:', result);
+      
       if (result?.error) {
-        throw new Error(result.error);
+        console.error('Sign-in error:', result.error);
+        setIsLoading(false);
+        return;
       }
-
+      
       if (result?.url) {
+        console.log('Redirecting to:', result.url);
         router.push(result.url);
       } else {
+        console.log('No URL returned, redirecting to dashboard');
         router.push('/dashboard');
       }
     } catch (error) {
@@ -94,13 +97,34 @@ export default function LoginPage() {
     }
   };
 
-  // Show loading state while checking session
-  if (status === 'loading') {
+  // Show loading state while checking session (but timeout after 3 seconds)
+  const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    if (status === 'loading') {
+      const timer = setTimeout(() => {
+        setShowLoadingTimeout(true);
+        console.log('Session loading timeout - forcing login form display');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
+
+  if (status === 'loading' && !showLoadingTimeout) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-pulse text-center">
-          <Logo size="lg" className="mx-auto mb-4" />
+          <img 
+            src="/jobbot%20logo%20.png" 
+            alt="JobBot Logo" 
+            className="h-24 w-24 object-contain mx-auto mb-4"
+            onError={(e) => {
+              console.error('Logo loading error:', e);
+              e.currentTarget.style.display = 'none';
+            }}
+          />
           <div className="h-4 w-32 bg-gray-200 rounded mx-auto"></div>
+          <div className="mt-4 text-sm text-gray-500">Loading...</div>
         </div>
       </div>
     );
@@ -109,19 +133,39 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <Logo size="lg" className="h-24 w-24" />
+        <div className="flex flex-col items-center justify-center">
+          <img 
+            src="/jobbot%20logo%20.png" 
+            alt="JobBot Logo" 
+            className="w-full max-w-[400px] h-auto object-contain mb-4"
+            onError={(e) => {
+              console.error('Logo loading error:', e);
+              // Fallback to text if logo fails
+              const fallback = document.createElement('div');
+              fallback.className = 'w-24 h-24 bg-green-500 rounded-xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4';
+              fallback.textContent = '🤖';
+              e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
+            }}
+          />
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+            JobBot
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Your AI-powered resume assistant
+          </p>
+          
+          {/* Debug info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-2 text-xs text-gray-400">
+              Session: {status} | Loading timeout: {showLoadingTimeout ? 'Yes' : 'No'}
+            </div>
+          )}
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          JobBot
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Your AI-powered resume assistant
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 border border-gray-200">
+          {/* Force login form to show if session is still loading after timeout */}
           {!showEmailForm ? (
             <div className="space-y-6">
               <button
@@ -133,6 +177,7 @@ export default function LoginPage() {
                   src="https://www.google.com/favicon.ico"
                   alt="Google"
                   className="h-5 w-5 mr-2"
+                  onError={(e) => e.currentTarget.style.display = 'none'}
                 />
                 {isLoading ? 'Signing in...' : 'Sign in with Google'}
               </button>

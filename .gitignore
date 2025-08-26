@@ -22,12 +22,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
-*.env
-.env.development
-.env.production
+# local env files (protect all environment files)
+.env*
+*.env*
+apps/web/.env*
+apps/server/.env*
+packages/*/.env*
 
 # vercel
 .vercel

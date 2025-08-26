@@ -6,49 +6,39 @@ export default withAuth(
   function middleware(req: NextRequest) {
     const token = req.nextauth?.token;
     const isAuth = !!token;
-    const isAuthPage = req.nextUrl.pathname.startsWith('/login');
-    const isRootPage = req.nextUrl.pathname === '/';
 
-    // Redirect authenticated users away from auth pages
-    if (isAuth && (isAuthPage || isRootPage)) {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
-    }
-
-    // Allow access to auth pages
-    if (isAuthPage) {
-      return NextResponse.next();
-    }
-
-    // Protect all other pages
+    // If no token on protected routes, send to login with return URL
     if (!isAuth) {
       let from = req.nextUrl.pathname;
       if (req.nextUrl.search) {
         from += req.nextUrl.search;
       }
-
-      return NextResponse.redirect(
-        new URL(`/login?from=${encodeURIComponent(from)}`, req.url)
-      );
+      return NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(from)}`, req.url));
     }
 
+    // Token exists, allow through
     return NextResponse.next();
   },
   {
+    // Ensure middleware uses the same secret to decode JWTs
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-      authorized: ({ token }) => true, // Let the above middleware handle the auth
+      authorized: ({ token }) => {
+        // Let the middleware function handle the logic
+        return true; // do not block here; logic above handles redirects
+      },
     },
   }
 );
 
 export const config = {
+  // Protect only app pages that require auth to avoid accidental loops
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/dashboard/:path*',
+    '/jobbot/:path*',
+    '/applications/:path*',
+    '/library/:path*',
+    '/scraper/:path*',
+    '/settings/:path*',
   ],
 };
