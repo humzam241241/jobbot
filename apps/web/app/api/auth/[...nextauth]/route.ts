@@ -45,8 +45,8 @@ const baseProviders = [
     allowDangerousEmailAccountLinking: true,
     authorization: {
       params: {
-        // Keep initial sign-in minimal; request Drive scopes later on-demand
-        scope: "openid email profile",
+        // Request Drive scope for Picker; switch to drive.readonly if you prefer read-only
+        scope: "openid email profile https://www.googleapis.com/auth/drive.file",
         access_type: "offline",
         prompt: "consent",
         response_type: "code"
@@ -127,18 +127,53 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user, account }) {
+      // Initial sign-in
+      if (account) {
+        (token as any).accessToken = account.access_token;
+        (token as any).refreshToken = account.refresh_token ?? (token as any).refreshToken;
+        (token as any).expiresAt = Math.floor(Date.now() / 1000) + (account.expires_in ?? 3600);
+      }
+
+      // Add basic user fields
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
-        token.role = adminEmails.includes(user.email || '') ? "admin" : "user";
+        token.role = adminEmails.includes(user.email || '') ? 'admin' : 'user';
       }
-      if (account?.provider) {
-        token.provider = account.provider;
+
+      // If access token is still valid, return it
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = (token as any).expiresAt as number | undefined;
+      if ((token as any).accessToken && expiresAt && now < expiresAt - 60) {
+        return token;
       }
-      if (account?.access_token) {
-        (token as any).accessToken = account.access_token as string;
+
+      // Refresh if we have a refresh token
+      const refreshToken = (token as any).refreshToken as string | undefined;
+      if (refreshToken) {
+        try {
+          const body = new URLSearchParams({
+            client_id: process.env.GOOGLE_CLIENT_ID || '',
+            client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+          });
+          const res = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+          });
+          const data: any = await res.json();
+          if (!res.ok) throw data;
+          (token as any).accessToken = data.access_token ?? (token as any).accessToken;
+          (token as any).expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600);
+          (token as any).refreshToken = data.refresh_token ?? (token as any).refreshToken;
+        } catch (e) {
+          (token as any).error = 'RefreshAccessTokenError';
+        }
       }
+
       return token;
     },
     async session({ session, token }) {
@@ -147,8 +182,9 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
         session.provider = token.provider;
       }
-      // expose access token for Google Picker
+      // Expose access token for Google Picker
       (session as any).accessToken = (token as any).accessToken as string | undefined;
+      (session as any).tokenError = (token as any).error;
       return session;
     },
     async signIn({ user, account, profile, email }) {

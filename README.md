@@ -1,3 +1,18 @@
+### Google Keys: Picker vs Other APIs
+
+- Picker key (client-side): `NEXT_PUBLIC_GOOGLE_API_KEY`
+  - Use ONLY for Google Picker + Drive from the browser.
+  - GCP Settings:
+    - Application restrictions: HTTP referrers
+      - http://localhost:3000, http://localhost:3000/*
+      - https://<prod>.vercel.app, https://<prod>.vercel.app/*
+    - API restrictions: Google Picker API + Google Drive API
+    - Same GCP project as your OAuth client.
+  - Using any “other APIs” key here commonly yields 403.
+
+- Other APIs key(s): `GOOGLE_OTHER_APIS_KEY` (server) and optionally `NEXT_PUBLIC_GOOGLE_OTHER_APIS_KEY` (client)
+  - Use for Vertex/GenAI/Custom Search, etc. Do NOT use for Picker.
+
 ### Fixing Google Login Loop
 
 1) Audit environment variables

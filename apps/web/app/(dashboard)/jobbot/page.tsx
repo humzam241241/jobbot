@@ -35,6 +35,7 @@ type Model = (typeof AI_PROVIDERS)[Provider][number];
 type InputType = 'file' | 'gdrive';
 
 // Get environment variables
+// Picker must use the dedicated Picker+Drive key
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const GOOGLE_APP_ID = process.env.NEXT_PUBLIC_GOOGLE_APP_ID;

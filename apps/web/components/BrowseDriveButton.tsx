@@ -237,7 +237,7 @@ export function GoogleDriveButton({
         <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
           <p>Debug Info:</p>
           <p>• API Key: {apiKey ? '✓ Set' : '✗ Missing'}</p>
-          <p>• App ID: {appId ? '✓ Set' : '✗ Missing'}</p>
+          <p>• App ID: {appId ? '✓ Set' : '(optional) Missing'}</p>
           <p>• Token: {hasToken ? '✓ Available' : '✗ Missing'}</p>
           <p>• Session: {status}</p>
         </div>
