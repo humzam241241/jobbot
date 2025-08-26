@@ -172,18 +172,12 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
       try {
-        const target = new URL(url, baseUrl);
-        // If redirected back to sign-in page for any reason, force dashboard
-        if (target.pathname.startsWith('/login')) {
-          return `${baseUrl}/dashboard`;
-        }
-        // Prefer callback URL if internal
-        if (target.origin === baseUrl) {
-          return target.toString();
-        }
+        const target = new URL(url);
+        if (target.origin === baseUrl) return url;
       } catch {}
-      return `${baseUrl}/dashboard`;
+      return baseUrl;
     }
   },
   events: {

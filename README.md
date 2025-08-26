@@ -1,3 +1,39 @@
+### Fixing Google Login Loop
+
+1) Audit environment variables
+- Dev: `NEXTAUTH_URL=http://localhost:3000`
+- Prod (Vercel): `NEXTAUTH_URL=https://<your-app>.vercel.app`
+- Ensure `NEXTAUTH_SECRET` is long/random and consistent across environments.
+
+2) Google OAuth Console
+- Authorized Redirect URIs:
+  - `http://localhost:3000/api/auth/callback/google`
+  - `https://<your-app>.vercel.app/api/auth/callback/google`
+- Authorized JavaScript origins:
+  - `http://localhost:3000`
+  - `https://<your-app>.vercel.app`
+
+3) NextAuth config
+- Google provider uses:
+  - `authorization.params = { prompt: 'consent', access_type: 'offline', response_type: 'code' }`
+- Session strategy: `jwt`
+- Redirect callback:
+  ```ts
+  if (url.startsWith('/')) return `${baseUrl}${url}`;
+  if (new URL(url).origin === baseUrl) return url;
+  return baseUrl;
+  ```
+
+4) Middleware
+- Do not protect `/api/auth/*` routes.
+- Protect only app pages (e.g., `/dashboard`, `/jobbot`, etc.).
+
+5) Local dev cookie fix
+- On localhost, `useSecureCookies` is disabled to avoid HTTPS-only cookie loops.
+
+6) Debugging
+- Visit `/debug/auth` in development to inspect session status and cookies (redacted).
+
 ## Environment Configuration (no secrets)
 
 Create `apps/web/.env.local` (do not commit) using these placeholders:

@@ -97,12 +97,9 @@ export function GoogleDriveButton({
         return;
       }
 
+      // App ID (project number) is optional for Picker; proceed without it if absent
       if (!appId) {
-        const errorMsg = 'Google App ID missing (NEXT_PUBLIC_GOOGLE_APP_ID)';
-        setError(errorMsg);
-        logError(errorMsg, { envVars: { apiKey: !!apiKey, appId: !!appId } }, 'GoogleDriveButton');
-        toast.error(errorMsg);
-        return;
+        logInfo('Proceeding without Google App ID; set NEXT_PUBLIC_GOOGLE_APP_ID to remove this notice', { envVars: { apiKey: !!apiKey, appId: !!appId } }, 'GoogleDriveButton');
       }
 
       if (!session?.accessToken) {
@@ -129,7 +126,7 @@ export function GoogleDriveButton({
       await openGoogleDrivePicker({
         accessToken: session.accessToken,
         developerKey: apiKey,
-        appId: appId,
+        appId: appId || '',
         onPicked: (file) => {
           logInfo('File selected from Google Drive', {
             fileId: file.id,
