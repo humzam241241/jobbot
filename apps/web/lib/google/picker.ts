@@ -59,7 +59,7 @@ export type PickerOptions = {
   accessToken: string; // OAuth token with Drive scope
   developerKey: string; // Google API key
   appId: string; // Numeric Google Cloud project number
-  onPicked: (file: { id: string; name: string; mimeType?: string }) => void;
+  onPicked: (file: { id: string; name: string; mimeType?: string; resourceKey?: string }) => void;
 };
 
 export async function openGoogleDrivePicker(options: PickerOptions): Promise<void> {
@@ -94,7 +94,7 @@ export async function openGoogleDrivePicker(options: PickerOptions): Promise<voi
     .setCallback((data: any) => {
       if (data?.action === google.picker.Action.PICKED && Array.isArray(data.docs) && data.docs[0]) {
         const f = data.docs[0];
-        onPicked({ id: f.id, name: f.name, mimeType: f.mimeType });
+        onPicked({ id: f.id, name: f.name, mimeType: f.mimeType, resourceKey: (f as any).resourceKey });
       }
     });
 

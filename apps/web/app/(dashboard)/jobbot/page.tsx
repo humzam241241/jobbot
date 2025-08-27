@@ -166,7 +166,7 @@ function JobBotContent() {
     }
   }, [gapiLoaded, gisLoaded, session, GOOGLE_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_APP_ID]);
 
-  const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, mimeType: string, accessToken: string) => {
+  const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, mimeType: string, accessToken: string, resourceKey?: string) => {
     setIsLoading(true);
     toast.loading('Downloading file from Google Drive...');
     setDebugMessage(`Downloading file ${fileName} from Google Drive...`);
@@ -174,9 +174,11 @@ function JobBotContent() {
     try {
       // Decide endpoint based on real mimeType from Picker
       const isGoogleDoc = mimeType === 'application/vnd.google-apps.document';
+      // Support resourceKey for restricted/shared-drive items if present in the picker payload (stored in filename hint)
+      const resourceKeyParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
       const url = isGoogleDoc
-        ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-        : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document${resourceKeyParam}`
+        : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media${resourceKeyParam}`;
 
       setDebugMessage(`Fetching from Drive: ${isGoogleDoc ? 'export (Google Doc → DOCX)' : 'download (binary)'}\nURL: ${url}`);
 
@@ -390,7 +392,7 @@ function JobBotContent() {
               setInputType('file');
               fileInputRef.current?.click();
             }}
-            className="flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            className="flex items-center justify-center h-16 w-[320px] px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
           >
             <FileText className="w-5 h-5 mr-2" />
             Upload DOCX
@@ -398,16 +400,16 @@ function JobBotContent() {
           
           {/* Enhanced Google Drive Button with logging and error handling */}
           <GoogleDriveButton
-            onFileSelect={async (fileId, fileName, mimeType) => {
+            onFileSelect={async (fileId, fileName, mimeType, resourceKey) => {
               logInfo('File selected from Google Drive in JobBot', { fileId, fileName, mimeType }, 'JobBot');
               setInputType('gdrive');
               try {
-                await handleGoogleDriveFileDownload(fileId, fileName, mimeType, session?.accessToken as string);
+                await handleGoogleDriveFileDownload(fileId, fileName, mimeType, session?.accessToken as string, resourceKey);
               } catch (error) {
                 logError('Failed to process Google Drive file in JobBot', error, 'JobBot');
               }
             }}
-            className=""
+            className="h-16 w-[320px]"
           />
           
           {/* Hidden file input for regular uploads */}

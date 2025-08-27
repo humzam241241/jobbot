@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 import { logInfo, logError, logGoogleDriveError } from '@/lib/logger';
 
 interface BrowseDriveButtonProps {
-  onFileSelect: (fileId: string, fileName: string, mimeType: string) => void;
+  onFileSelect: (fileId: string, fileName: string, mimeType: string, resourceKey?: string) => void;
   className?: string;
 }
 
@@ -131,10 +131,11 @@ export function GoogleDriveButton({
           logInfo('File selected from Google Drive', {
             fileId: file.id,
             fileName: file.name,
-            mimeType: file.mimeType
+            mimeType: file.mimeType,
+            resourceKey: (file as any).resourceKey
           }, 'GoogleDriveButton');
-          
-          onFileSelect(file.id, file.name, file.mimeType || 'application/octet-stream');
+
+          onFileSelect(file.id, file.name, file.mimeType || 'application/octet-stream', (file as any).resourceKey);
           toast.success(`✅ Selected: ${file.name}`);
         }
       });
