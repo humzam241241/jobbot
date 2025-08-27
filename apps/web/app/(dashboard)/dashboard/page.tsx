@@ -79,25 +79,25 @@ export default function DashboardPage() {
         />
         
         <QuickLink
-          href="/applications"
+          href="#"
           title="Applications"
-          description="Track your job applications and status"
+          description="Coming soon"
           icon={<Briefcase className="h-6 w-6 text-[#00E5A0]" />}
           isReady={false}
         />
         
         <QuickLink
-          href="/scraper"
+          href="#"
           title="Job Scraper"
-          description="Find relevant job postings automatically"
+          description="Coming soon"
           icon={<Search className="h-6 w-6 text-[#00E5A0]" />}
           isReady={false}
         />
         
         <QuickLink
-          href="/library"
+          href="#"
           title="Library"
-          description="Access your saved resumes and templates"
+          description="Coming soon"
           icon={<BookOpen className="h-6 w-6 text-[#00E5A0]" />}
           isReady={false}
         />

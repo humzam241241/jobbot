@@ -201,37 +201,7 @@ export function GoogleDriveButton({
         {getButtonText()}
       </button>
       
-      {error && (
-        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start">
-            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-red-700">
-              {error.includes('API key') ? (
-                <div>
-                  <p className="font-medium mb-1">Google Drive API configuration error:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Check NEXT_PUBLIC_GOOGLE_API_KEY is set</li>
-                    <li>Verify API key has correct referrer restrictions</li>
-                    <li>Ensure Google Drive and Picker APIs are enabled</li>
-                    <li>Check NEXT_PUBLIC_GOOGLE_APP_ID is configured</li>
-                  </ul>
-                </div>
-              ) : (
-                <p>{error}</p>
-              )}
-              <button
-                onClick={() => {
-                  setError(null);
-                  logInfo('Error dismissed by user', { previousError: error }, 'GoogleDriveButton');
-                }}
-                className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Intentionally remove persistent error boxes from UI; rely on toasts instead */}
 
       {/* Debug info in development */}
       {process.env.NODE_ENV === 'development' && (

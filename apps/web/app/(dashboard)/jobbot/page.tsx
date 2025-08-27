@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import { openGoogleDrivePicker } from '@/lib/google/picker';
 import { GoogleDriveButton } from '@/components/BrowseDriveButton';
 import { logInfo, logError } from '@/lib/logger';
+import SelectedFileBanner from '@/components/dashboard/SelectedFileBanner';
 
 // Define window.gapi and window.google types
 declare global {
@@ -166,19 +167,49 @@ function JobBotContent() {
     }
   }, [gapiLoaded, gisLoaded, session, GOOGLE_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_APP_ID]);
 
-  const handleGoogleDriveFileDownload = async (fileId: string, fileName: string, mimeType: string, accessToken: string, resourceKey?: string) => {
+  const handleGoogleDriveFileDownload = async (
+    fileId: string,
+    fileName: string,
+    mimeType: string,
+    accessToken: string,
+    resourceKey?: string
+  ) => {
     setIsLoading(true);
     toast.loading('Downloading file from Google Drive...');
     setDebugMessage(`Downloading file ${fileName} from Google Drive...`);
 
     try {
       // Decide endpoint based on real mimeType from Picker
-      const isGoogleDoc = mimeType === 'application/vnd.google-apps.document';
-      // Support resourceKey for restricted/shared-drive items if present in the picker payload (stored in filename hint)
-      const resourceKeyParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
+      // Resolve shortcuts and collect resourceKey/supportsAllDrives before downloading
+      const metaUrl = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`);
+      metaUrl.searchParams.set('fields', 'id,name,mimeType,shortcutDetails,targetId,resourceKey');
+      metaUrl.searchParams.set('supportsAllDrives', 'true');
+      metaUrl.searchParams.set('includeItemsFromAllDrives', 'true');
+
+      let effectiveId = fileId;
+      let effectiveMime = mimeType;
+      let effectiveResourceKey = resourceKey;
+
+      try {
+        const metaRes = await fetch(metaUrl.toString(), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (metaRes.ok) {
+          const meta: any = await metaRes.json();
+          if (meta?.shortcutDetails?.targetId) {
+            effectiveId = meta.shortcutDetails.targetId;
+            effectiveMime = meta.shortcutDetails.targetMimeType || effectiveMime;
+          }
+          if (meta?.resourceKey && !effectiveResourceKey) effectiveResourceKey = meta.resourceKey;
+        }
+      } catch {}
+
+      const isGoogleDoc = effectiveMime === 'application/vnd.google-apps.document';
+      const qs = new URLSearchParams({ supportsAllDrives: 'true' });
+      if (effectiveResourceKey) qs.set('resourceKey', effectiveResourceKey);
       const url = isGoogleDoc
-        ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document${resourceKeyParam}`
-        : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media${resourceKeyParam}`;
+        ? `https://www.googleapis.com/drive/v3/files/${effectiveId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document&${qs.toString()}`
+        : `https://www.googleapis.com/drive/v3/files/${effectiveId}?alt=media&${qs.toString()}`;
 
       setDebugMessage(`Fetching from Drive: ${isGoogleDoc ? 'export (Google Doc → DOCX)' : 'download (binary)'}\nURL: ${url}`);
 
@@ -356,32 +387,9 @@ function JobBotContent() {
         </div>
       </div>
 
-      {/* Drive Diagnostics */}
-      <div className="mb-4 text-xs text-gray-700 flex justify-center gap-4">
-        <div className="px-2 py-1 rounded border flex items-center">
-          <span>Drive token:</span>
-          {session?.accessToken ? (
-            <span className="ml-1 text-green-600">present</span>
-          ) : (
-            <span className="ml-1 text-red-600">missing</span>
-          )}
-        </div>
-        <div className="px-2 py-1 rounded border flex items-center">
-          <span>Picker key:</span>
-          {GOOGLE_API_KEY ? (
-            <span className="ml-1 text-green-600">configured</span>
-          ) : (
-            <span className="ml-1 text-red-600">missing</span>
-          )}
-        </div>
-      </div>
+      {/* Diagnostics hidden for cleaner UI */}
       
-      {/* Debug Message */}
-      {debugMessage && (
-        <div className="text-xs bg-gray-100 p-2 rounded text-gray-700 max-h-20 overflow-auto mb-4 mx-auto max-w-3xl">
-          {debugMessage}
-        </div>
-      )}
+      {/* Remove persistent debug message block from UI; rely on toasts and console */}
       
       <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl mx-auto">
         {/* Input Type Selection */}
@@ -424,17 +432,7 @@ function JobBotContent() {
 
         {/* File Display */}
         {selectedFile && (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Selected Document
-            </label>
-            <div className="border-2 border-gray-300 rounded-lg p-4">
-              <div className="flex items-center">
-                <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                <span className="text-sm text-gray-600">{selectedFile.name}</span>
-              </div>
-            </div>
-          </div>
+          <SelectedFileBanner name={selectedFile.name} />
         )}
 
         {/* Job Description */}

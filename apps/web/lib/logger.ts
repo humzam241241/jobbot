@@ -168,3 +168,21 @@ export const logDebug = (message: string, details?: any, component?: string) =>
 
 export const logGoogleDriveError = (operation: string, error: GoogleDriveError, details?: any) => 
   logger.googleDriveError(operation, error, details);
+
+// Factory to create a component-scoped logger compatible with existing imports
+export function createLogger(component: string) {
+  return {
+    info(message: string, details?: any) {
+      logger.info(message, details, component);
+    },
+    warn(message: string, details?: any) {
+      logger.warn(message, details, component);
+    },
+    error(message: string, error?: any) {
+      logger.error(message, error, component);
+    },
+    debug(message: string, details?: any) {
+      logger.debug(message, details, component);
+    },
+  } as const;
+}

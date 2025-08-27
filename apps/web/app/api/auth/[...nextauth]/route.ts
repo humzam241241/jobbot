@@ -45,8 +45,8 @@ const baseProviders = [
     allowDangerousEmailAccountLinking: true,
     authorization: {
       params: {
-        // Request Drive scope for Picker; switch to drive.readonly if you prefer read-only
-        scope: "openid email profile https://www.googleapis.com/auth/drive.file",
+        // Include read-only to permit selecting existing files not created by the app
+        scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
         access_type: "offline",
         prompt: "consent",
         response_type: "code"

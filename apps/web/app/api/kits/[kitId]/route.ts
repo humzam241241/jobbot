@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { createKitDirectory } from '@/lib/pipeline';
 import path from 'path';
 import { mkdir } from 'fs/promises';

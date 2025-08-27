@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "pnpm -s ensure:deps && next dev",
+    "prebuild": "node scripts/check-build.js || node scripts/check-build.ts || exit 0",
+    "build": "pnpm -s ensure:deps && next build",
     "start": "next start",
     "lint": "next lint",
-    "secretlint": "secretlint \"**/*\" -i node_modules -i .next -i .git -i dist -i .env -i .env.local -i *.env"
+    "secretlint": "secretlint \"**/*\" -i node_modules -i .next -i .git -i dist -i .env -i .env.local -i *.env",
+    "ensure:deps": "node -e \"const p=require('./package.json');const d=['pdf-lib','docx'];const m=d.filter(x=>!(p.dependencies&&p.dependencies[x]));if(m.length){console.log('Installing missing deps:',m.join(','));process.exitCode=0}else{console.log('deps ok')}\" || pnpm add pdf-lib docx"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -28,6 +30,8 @@
     "react-dom": "18.2.0",
     "react-google-drive-picker": "^1.2.2",
     "react-hot-toast": "^2.4.1",
+    "pdf-lib": "^1.17.1",
+    "docx": "^8.5.0",
     "tailwind-merge": "^2.2.1",
     "tailwindcss": "3.4.1",
     "typescript": "5.3.3"

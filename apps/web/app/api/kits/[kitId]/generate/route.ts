@@ -30,6 +30,15 @@ export async function POST(
 
     // Minimal placeholder generation: copy source.docx into outputs
     const uploadDir = path.join(process.cwd(), 'uploads', params.kitId);
+    try {
+      await writeFile(path.join(uploadDir, '.keep'), new Uint8Array());
+    } catch {
+      // Create directory tree if it does not exist
+      try {
+        const { mkdir } = await import('fs/promises');
+        await mkdir(uploadDir, { recursive: true });
+      } catch {}
+    }
     const sourcePath = path.join(uploadDir, 'source.docx');
     let resumeText = '';
     try {
@@ -85,7 +94,7 @@ export async function POST(
     // Render real PDFs using pdf-lib
     async function renderPdfFromHtmlLike(content: string, outName: string) {
       const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([595.28, 841.89]); // A4
+      let page = pdfDoc.addPage([595.28, 841.89]); // A4
       const { width, height } = page.getSize();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontSize = 12;
@@ -119,9 +128,7 @@ export async function POST(
         }
         if (y < margin) {
           // new page when overflow
-          const p = pdfDoc.addPage([595.28, 841.89]);
-          page.setSize(0,0); // no-op just to keep linter happy
-          (page as any) = p;
+          page = pdfDoc.addPage([595.28, 841.89]);
           y = height - margin;
         }
       }
@@ -160,10 +167,11 @@ export async function POST(
       console.warn('Failed to render DOCX:', e);
     }
 
+    // Return 6 artifacts: 2 resumes, 2 cover letters, 2 ATS reports in PDF/DOCX
     const fileList = [
-      'resume_tailored.docx','resume_tailored.pdf',
-      'cover_letter.docx','cover_letter.pdf',
-      'ats_report.docx','ats_report.pdf'
+      'resume_tailored.docx', 'resume_tailored.pdf',
+      'cover_letter.docx', 'cover_letter.pdf',
+      'ats_report.docx', 'ats_report.pdf'
     ];
 
     // Write a simple manifest so the results page can reliably list outputs
