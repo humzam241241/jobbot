@@ -18,6 +18,11 @@ const nextConfig = {
         'pdfjs-dist': 'commonjs pdfjs-dist/legacy/build/pdf',
         canvas: 'commonjs canvas',
         jsdom: 'commonjs jsdom',
+        playwright: 'commonjs playwright',
+        'chrome-aws-lambda': 'commonjs chrome-aws-lambda',
+        puppeteer: 'commonjs puppeteer',
+        'puppeteer-core': 'commonjs puppeteer-core',
+        'html-pdf-node': 'commonjs html-pdf-node',
       });
     } else {
       // Client-side configuration
@@ -31,6 +36,11 @@ const nextConfig = {
       'canvas',
       'pdfjs-dist',
       'jsdom',
+      'playwright',
+      'chrome-aws-lambda',
+      'puppeteer',
+      'puppeteer-core',
+      'html-pdf-node',
     ],
   },
 }
