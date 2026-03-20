@@ -4,11 +4,18 @@
  */
 
 import { logger } from '@/lib/logger';
-import puppeteer from 'puppeteer-core';
-import chrome from 'chrome-aws-lambda';
+async function lazyPuppeteerCore() {
+  const mod = await import('puppeteer-core');
+  return mod.default;
+}
+
+async function lazyChromeAwsLambda() {
+  const mod = await import('chrome-aws-lambda');
+  return mod.default;
+}
 
 // Keep track of the browser instance
-let browserPromise: Promise<puppeteer.Browser> | null = null;
+let browserPromise: Promise<any> | null = null;
 
 /**
  * Generate a PDF from HTML content using puppeteer-core
@@ -68,8 +75,10 @@ export async function generateServerPdf(
       browserPromise = (async () => {
         try {
           // Try to use chrome-aws-lambda for environments like Vercel
+          const chrome = await lazyChromeAwsLambda();
+          const puppeteer = await lazyPuppeteerCore();
           const executablePath = await chrome.executablePath;
-          
+
           if (executablePath) {
             return puppeteer.launch({
               args: chrome.args,
@@ -106,7 +115,7 @@ export async function generateServerPdf(
     await page.setContent(styledHtml, { waitUntil: 'networkidle0' });
     
     // Set PDF options
-    const pdfOptions: puppeteer.PDFOptions = {
+    const pdfOptions: any = {
       format: options.size === 'A4' ? 'a4' : 'letter',
       printBackground: true,
       margin: {

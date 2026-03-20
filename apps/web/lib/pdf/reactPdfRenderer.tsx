@@ -2,8 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import "server-only";
 import { renderReactToHtml } from './serverRenderer';
-import puppeteer from 'puppeteer-core';
-import chrome from 'chrome-aws-lambda';
+async function lazyPuppeteerCore() {
+  const mod = await import('puppeteer-core');
+  return mod.default;
+}
+async function lazyChromeAwsLambda() {
+  const mod = await import('chrome-aws-lambda');
+  return mod.default;
+}
 import { createLogger } from '@/lib/logger';
 import { PDFGenerationError, withPdfErrorHandling, createErrorPdf, retryWithBackoff } from './errorHandling';
 import MasterResume, { MasterResumeProps } from '@/components/resume/MasterResume';
@@ -13,7 +19,7 @@ import ATSReport, { ATSReportProps } from '@/components/resume/ATSReport';
 const logger = createLogger('react-pdf-renderer');
 
 // Keep track of the browser instance
-let browserPromise: Promise<puppeteer.Browser> | null = null;
+let browserPromise: Promise<any> | null = null;
 
 /**
  * Get or create a browser instance
@@ -23,8 +29,10 @@ async function getBrowser() {
     browserPromise = (async () => {
       try {
         // Try to use chrome-aws-lambda for environments like Vercel
+        const chrome = await lazyChromeAwsLambda();
+        const puppeteer = await lazyPuppeteerCore();
         const executablePath = await chrome.executablePath;
-        
+
         if (executablePath) {
           return puppeteer.launch({
             args: chrome.args,
@@ -124,7 +132,7 @@ export async function generatePdfFromReact<T extends React.ElementType>(
     await page.setContent(wrappedHtml, { waitUntil: 'networkidle0' });
     
     // Set PDF options
-    const pdfOptions: puppeteer.PDFOptions = {
+    const pdfOptions: any = {
       format: options.size === 'A4' ? 'a4' : 'letter',
       printBackground: true,
       margin: {

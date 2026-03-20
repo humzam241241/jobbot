@@ -1,6 +1,10 @@
-import puppeteer from 'puppeteer';
 import { logger } from '@/lib/logger';
 import { wrapForPrint } from './sanitize';
+
+async function lazyPuppeteer() {
+  const mod = await import('puppeteer');
+  return mod.default;
+}
 
 /**
  * Convert HTML to PDF using Puppeteer
@@ -15,6 +19,7 @@ export async function puppeteerHtmlToPdf(
   let browser;
   try {
     // Launch browser
+    const puppeteer = await lazyPuppeteer();
     browser = await puppeteer.launch({
       headless: "new",
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
