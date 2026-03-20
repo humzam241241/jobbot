@@ -1,4 +1,3 @@
-import { chromium, Browser } from "playwright";
 import { wrapForPrint } from "./sanitize";
 import { createLogger } from "@/lib/logger";
 import { puppeteerHtmlToPdf, generateSimplePdf } from "./puppeteerRenderer";
@@ -7,8 +6,17 @@ import { generateServerPdf } from "./serverPdf";
 
 const logger = createLogger('pdf-renderer');
 
+/**
+ * Lazily import playwright — only when actually needed at runtime.
+ * This prevents the Vercel build from failing due to missing playwright binaries.
+ */
+async function lazyPlaywright() {
+  const { chromium } = await import("playwright");
+  return chromium;
+}
+
 // Maintain a singleton browser instance
-let browserPromise: Promise<Browser> | null = null;
+let browserPromise: Promise<any> | null = null;
 
 /**
  * Get or create a browser instance
@@ -17,12 +25,13 @@ async function getBrowser() {
   if (!browserPromise) {
     try {
       logger.info('Launching browser with explicit options');
-      browserPromise = chromium.launch({ 
-        headless: true, 
+      const chromium = await lazyPlaywright();
+      browserPromise = chromium.launch({
+        headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
         timeout: 60000, // Longer timeout for browser launch
       });
-    } catch (err) {
+    } catch (err: any) {
       logger.error('Failed to launch browser:', { error: err });
       throw new Error(`Browser launch failed: ${err.message}`);
     }
@@ -42,8 +51,9 @@ async function playwrightHtmlToPdf(
     
     // Launch a new browser instance directly instead of using the singleton
     // This helps avoid issues with the shared browser instance
-    const browser = await chromium.launch({ 
-      headless: true, 
+    const chromium = await lazyPlaywright();
+    const browser = await chromium.launch({
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
       timeout: 60000, // Longer timeout for browser launch
     });
