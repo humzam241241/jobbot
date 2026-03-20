@@ -1,7 +1,10 @@
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, convertInchesToTwip, LevelFormat } from 'docx';
 import { NormalizedResume } from '@/lib/types/resume';
 import { optimizeLayout, generateHtml } from '@/lib/format/pageLayout';
-import html_to_pdf from 'html-pdf-node';
+async function lazyHtmlToPdf() {
+  const mod = await import('html-pdf-node');
+  return mod.default;
+}
 import JSZip from 'jszip';
 
 interface DocumentOptions {
@@ -207,7 +210,7 @@ async function generatePdf(resume: NormalizedResume): Promise<Buffer> {
   const layout = optimizeLayout(resume);
   const html = generateHtml(resume, layout);
 
-  const buffer = await html_to_pdf.generatePdf(
+  const buffer = await (await lazyHtmlToPdf()).generatePdf(
     { content: html },
     { 
       format: 'Letter',
@@ -237,7 +240,7 @@ export async function generateDocuments(
   const docx = createDocxDocument(resume);
   const docxBuffer = await docx.save();
   const pdfBuffer = await generatePdf(resume);
-  const atsReportBuffer = await html_to_pdf.generatePdf(
+  const atsReportBuffer = await (await lazyHtmlToPdf()).generatePdf(
     { content: atsReport },
     { format: 'Letter' }
   );

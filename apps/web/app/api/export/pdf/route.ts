@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import html_to_pdf from "html-pdf-node";
+async function lazyHtmlToPdf() {
+  const mod = await import("html-pdf-node");
+  return mod.default;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -173,6 +176,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const html_to_pdf = await lazyHtmlToPdf();
     const fileBuffer = await html_to_pdf.generatePdf(
       { content: getHtmlWithStyle(htmlContent) },
       { format: "A4" }

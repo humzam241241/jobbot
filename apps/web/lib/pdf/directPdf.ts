@@ -4,7 +4,10 @@
  */
 
 import { logger } from '@/lib/logger';
-import htmlPdf from 'html-pdf-node';
+async function lazyHtmlPdfNode() {
+  const mod = await import('html-pdf-node');
+  return mod.default;
+}
 
 /**
  * Generate a PDF from HTML content
@@ -67,6 +70,7 @@ export async function generateDirectPdf(
     
     // Generate PDF
     const file = { content: styledHtml };
+    const htmlPdf = await lazyHtmlPdfNode();
     const pdfBuffer = await htmlPdf.generatePdf(file, pdfOptions);
     
     logger.info(`PDF generated successfully, size: ${pdfBuffer.length} bytes`);
