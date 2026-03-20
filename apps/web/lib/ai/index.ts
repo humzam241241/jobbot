@@ -80,3 +80,6 @@ const providers: Record<string, AIProvider> = {
 export function getAiProvider(model: string = "auto"): AIProvider {
   return providers[model] || defaultProvider;
 }
+
+// Re-export generateAny from generate module
+export { generateAny } from "./generate";

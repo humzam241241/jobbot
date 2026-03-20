@@ -31,6 +31,7 @@ const nextConfig = {
         puppeteer: 'commonjs puppeteer',
         'puppeteer-core': 'commonjs puppeteer-core',
         'html-pdf-node': 'commonjs html-pdf-node',
+        'pdf-parse': 'commonjs pdf-parse',
       });
     } else {
       // Client-side configuration
@@ -49,6 +50,7 @@ const nextConfig = {
       'puppeteer',
       'puppeteer-core',
       'html-pdf-node',
+      'pdf-parse',
     ],
   },
 }
