@@ -16,6 +16,8 @@ const nextConfig = {
       // External modules that should not be bundled
       config.externals.push({
         'pdfjs-dist': 'commonjs pdfjs-dist/legacy/build/pdf',
+        'pdfjs-dist/build/pdf.worker.js': 'commonjs pdfjs-dist/build/pdf.worker.js',
+        'pdfjs-dist/legacy/build/pdf.worker.js': 'commonjs pdfjs-dist/legacy/build/pdf.worker.js',
         canvas: 'commonjs canvas',
         jsdom: 'commonjs jsdom',
         playwright: 'commonjs playwright',
