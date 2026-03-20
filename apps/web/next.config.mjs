@@ -26,19 +26,36 @@ const nextConfig = {
         'pdfjs-dist/legacy/build/pdf.worker.js': 'commonjs pdfjs-dist/legacy/build/pdf.worker.js',
         canvas: 'commonjs canvas',
         jsdom: 'commonjs jsdom',
-        playwright: 'commonjs playwright',
-        'chrome-aws-lambda': 'commonjs chrome-aws-lambda',
-        puppeteer: 'commonjs puppeteer',
-        'puppeteer-core': 'commonjs puppeteer-core',
-        'html-pdf-node': 'commonjs html-pdf-node',
         'pdf-parse': 'commonjs pdf-parse',
       });
+
+      // These modules are too large for serverless (puppeteer bundles Chromium ~280MB)
+      // They are lazy-imported at runtime only when needed, so resolve to empty stubs
+      config.externals.push(
+        function ({ request }, callback) {
+          if (/^(puppeteer|puppeteer-core|chrome-aws-lambda|playwright|html-pdf-node)$/.test(request)) {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        }
+      );
     } else {
       // Client-side configuration
       config.resolve.alias['pdfjs-dist'] = 'pdfjs-dist/build/pdf';
     }
     
     return config;
+  },
+  outputFileTracingExcludes: {
+    '*': [
+      './node_modules/puppeteer/.local-chromium/**',
+      './node_modules/puppeteer-core/.local-chromium/**',
+      './node_modules/puppeteer/**',
+      './node_modules/puppeteer-core/**',
+      './node_modules/chrome-aws-lambda/**',
+      './node_modules/playwright/**',
+      './node_modules/playwright-core/**',
+    ],
   },
   experimental: {
     serverComponentsExternalPackages: [
