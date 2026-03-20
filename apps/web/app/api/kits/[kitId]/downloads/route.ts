@@ -4,8 +4,7 @@ import path from "path";
 import { kitDir, kitFileExists, readKitFile } from "@/lib/fs/storage";
 import { createLogger } from '@/lib/logger';
 import { getServerSession } from "next-auth";
-// Import authOptions directly from our NextAuth route handler to avoid path alias issues
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 const logger = createLogger('api-kits-downloads');
 

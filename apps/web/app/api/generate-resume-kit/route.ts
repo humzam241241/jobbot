@@ -6,7 +6,7 @@ import { createLogger } from "@/lib/logger";
 import { generateResumeKit } from "@/lib/ai/orchestrator";
 import { renderMarkdownToPDF, saveFile } from "@/lib/artifacts";
 import { JobDescriptionSchema, ResumeInputSchema } from "@/lib/zod";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
