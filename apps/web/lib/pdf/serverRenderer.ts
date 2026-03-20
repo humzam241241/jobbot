@@ -3,7 +3,7 @@ import "server-only";
 
 // Import only the type, not the actual implementation
 import type { ReactNode } from 'react';
-import puppeteer from 'puppeteer';
+import type puppeteerType from 'puppeteer';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -49,8 +49,9 @@ export async function generatePdfFromHtml(
     </html>
   `;
   
-  // Launch browser
-  const browser = await puppeteer.launch({ 
+  // Launch browser (lazy import to avoid bundling puppeteer at build time)
+  const puppeteer = await import('puppeteer');
+  const browser = await puppeteer.default.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
@@ -63,7 +64,7 @@ export async function generatePdfFromHtml(
     await page.setContent(wrappedHtml, { waitUntil: 'networkidle0' });
     
     // Set PDF options
-    const pdfOptions: puppeteer.PDFOptions = {
+    const pdfOptions: puppeteerType.PDFOptions = {
       format: options.size === 'A4' ? 'a4' : 'letter',
       printBackground: true,
       margin: {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAny } from "@/lib/ai";
-import { anyAIKey } from "@/lib/env";
+import { hasAnyProvider as anyAIKey } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

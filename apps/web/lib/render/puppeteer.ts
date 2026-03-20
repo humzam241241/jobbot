@@ -1,11 +1,15 @@
-import puppeteer from "puppeteer";
-
 let browser: import("puppeteer").Browser | null = null;
+
+async function lazyPuppeteer() {
+  const mod = await import("puppeteer");
+  return mod.default;
+}
 
 export async function getBrowser() {
   if (!browser) {
     try {
-      browser = await puppeteer.launch({ 
+      const puppeteer = await lazyPuppeteer();
+      browser = await puppeteer.launch({
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
         headless: 'new'
       });

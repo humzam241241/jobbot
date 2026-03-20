@@ -5,12 +5,13 @@ import pdf from 'pdf-parse';
 import fs from 'fs';
 import path from 'path';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
-import puppeteer from 'puppeteer';
+// puppeteer is imported lazily to avoid bundling at build time
 
 const logger = createLogger('resume-processor');
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 /**
  * Extract text from a PDF or DOCX file
@@ -48,7 +49,7 @@ async function rewriteContent(resumeText: string, jobDescription: string): Promi
     Rewrite the resume in a clean format, maintaining professional language and focusing on relevant experience.
   `;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
@@ -81,7 +82,8 @@ async function createDocx(content: string, outputPath: string): Promise<void> {
  * Convert DOCX to PDF using Puppeteer
  */
 async function convertToPdf(docxPath: string, pdfPath: string): Promise<void> {
-  const browser = await puppeteer.launch({ headless: 'new' });
+  const puppeteer = await import('puppeteer');
+  const browser = await puppeteer.default.launch({ headless: 'new' });
   const page = await browser.newPage();
   
   // Load DOCX content

@@ -1,4 +1,3 @@
-import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 
@@ -6,9 +5,9 @@ export async function htmlToPdf(html: string, outPath: string) {
   const dir = path.dirname(outPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const browser = await puppeteer.launch({
+  const puppeteer = await import("puppeteer");
+  const browser = await puppeteer.default.launch({
     headless: true,
-    executablePath: (puppeteer as any).executablePath?.() || undefined,
     args: ["--no-sandbox","--disable-setuid-sandbox"]
   });
   const page = await browser.newPage();

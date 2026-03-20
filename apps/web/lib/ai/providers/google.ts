@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createLogger } from '@/lib/logger';
+import { Provider, GenInput, GenResult, AIProviderError } from './types';
 
 const logger = createLogger('google-provider');
 
@@ -14,31 +15,42 @@ export type GoogleResult = {
   };
 };
 
-export class GoogleProvider {
+export class GoogleProvider implements Provider {
+  name = "google" as const;
   private modelId: string;
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenerativeAI | null = null;
 
   constructor(modelId = "gemini-2.5-pro") {
-    const key = process.env.GOOGLE_API_KEY;
-    if (!key) {
-      logger.error('GOOGLE_API_KEY is not set');
-      throw new Error("GOOGLE_API_KEY is not set");
-    }
-    this.client = new GoogleGenerativeAI(key);
     this.modelId = modelId;
-    logger.info('GoogleProvider initialized', { modelId });
   }
 
-  async generate(prompt: string): Promise<GoogleResult> {
+  available(): boolean {
+    return Boolean(process.env.GOOGLE_API_KEY);
+  }
+
+  private getClient(): GoogleGenerativeAI {
+    if (this.client) return this.client;
+    const key = process.env.GOOGLE_API_KEY;
+    if (!key) {
+      throw new AIProviderError({
+        code: 'AUTH',
+        message: 'GOOGLE_API_KEY is not set',
+      });
+    }
+    this.client = new GoogleGenerativeAI(key);
+    logger.info('GoogleProvider initialized', { modelId: this.modelId });
+    return this.client;
+  }
+
+  async generate(input: GenInput): Promise<GenResult> {
     logger.info('Generating with Google', { modelId: this.modelId });
 
     try {
-      // Use GenerativeModel API with JSON response mime type
-      const model = this.client.getGenerativeModel({ model: this.modelId });
+      const model = this.getClient().getGenerativeModel({ model: this.modelId });
       const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: input.prompt }] }],
         generationConfig: {
-          temperature: 0.3,
+          temperature: input.temperature ?? 0.3,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 32768,
@@ -50,59 +62,39 @@ export class GoogleProvider {
       if (!text || !text.trim()) {
         const finish = result?.response?.candidates?.[0]?.finishReason;
         logger.error('No content from Google', { finish });
-        throw Object.assign(
-          new Error("NO_CONTENT_FROM_GOOGLE"), 
-          { code: "NO_CONTENT_FROM_GOOGLE", finish }
-        );
+        throw new AIProviderError({
+          code: 'SERVER',
+          message: 'No content from Google',
+          details: { finish },
+        });
       }
 
       try {
-        const parsed = JSON.parse(text) as GoogleResult;
-        logger.info('Successfully parsed Google response', {
-          resumeLength: parsed.resume_markdown.length,
-          coverLetterLength: parsed.cover_letter_markdown.length,
-          atsScore: parsed.ats_report.score
-        });
-        return parsed;
+        const parsed = JSON.parse(text);
+        return { json: parsed, raw: text };
       } catch (e) {
-        logger.error('Failed to parse Google response', { 
+        logger.error('Failed to parse Google response', {
           error: e,
           text: text.slice(0, 100) + '...'
         });
-        throw Object.assign(
-          new Error("GOOGLE_JSON_PARSE_ERROR"), 
-          { code: "GOOGLE_JSON_PARSE_ERROR", raw: text }
-        );
+        throw new AIProviderError({
+          code: 'SERVER',
+          message: 'Failed to parse Google JSON response',
+          details: { raw: text.slice(0, 200) },
+        });
       }
     } catch (e: any) {
-      // If it's already an error we created, rethrow it
-      if (e.code === "NO_CONTENT_FROM_GOOGLE" || e.code === "GOOGLE_JSON_PARSE_ERROR") {
-        throw e;
-      }
+      if (e instanceof AIProviderError) throw e;
 
-      // Otherwise, wrap it in a provider error
       logger.error('Google provider error', {
-        error: {
-          message: e.message,
-          code: e.code,
-          status: e.status,
-          details: e.details
-        }
+        error: { message: e.message, code: e.code, status: e.status }
       });
 
-      throw Object.assign(
-        new Error("GOOGLE_PROVIDER_ERROR"),
-        { 
-          code: "GOOGLE_PROVIDER_ERROR",
-          cause: e,
-          details: {
-            message: e.message,
-            code: e.code,
-            status: e.status,
-            details: e.details
-          }
-        }
-      );
+      throw new AIProviderError({
+        code: 'SERVER',
+        message: e.message || 'Google provider error',
+        details: { originalCode: e.code, status: e.status },
+      });
     }
   }
 }

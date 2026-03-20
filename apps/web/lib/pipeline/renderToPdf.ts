@@ -1,7 +1,6 @@
 // apps/web/lib/pipeline/renderToPdf.ts
 import "server-only";
 
-import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs/promises";
 import { toHtmlString, HtmlLike } from "./html.server";
@@ -53,7 +52,8 @@ export async function renderToPdf(opts: PdfOptions) {
 <body>${html}</body>
 </html>`;
 
-  const browser = await puppeteer.launch({ headless: true });
+  const puppeteer = await import("puppeteer");
+  const browser = await puppeteer.default.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.setContent(pageHtml, { waitUntil: "networkidle0" });
