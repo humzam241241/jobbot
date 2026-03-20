@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+async function lazyPuppeteer() {
+  const mod = await import('puppeteer');
+  return mod.default;
+}
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('job-extractor');
@@ -15,6 +18,7 @@ export async function POST(req: NextRequest) {
     logger.info('Extracting job description from URL', { url });
 
     // Launch puppeteer with stealth mode
+    const puppeteer = await lazyPuppeteer();
     const browser = await puppeteer.launch({
       headless: 'new',
       args: [

@@ -28,6 +28,7 @@
     "clsx": "^2.1.0",
     "docx": "^8.5.0",
     "googleapis": "^133.0.0",
+    "html-pdf-node": "^1.0.8",
     "jsdom": "^29.0.1",
     "json5": "^2.2.3",
     "jsonrepair": "^3.13.3",
