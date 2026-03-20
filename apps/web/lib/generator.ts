@@ -1,11 +1,11 @@
-import { generateAny } from "./ai";
+import { generateAny } from "./ai/generate";
 import type { Usage } from "./ai/types";
 import { scrapeJobSummary } from "@/lib/job";
-import { RESUME_CONTENT_PROMPT } from "./prompts/resumeContent";
-import { COVER_LETTER_PROMPT } from "./prompts/coverLetterContent";
-import { computeAtsScore } from "./ats/score";
+import { RESUME_CONTENT_SYSTEM_PROMPT } from "./prompts/resumeContent";
+import { COVER_LETTER_SYSTEM_PROMPT } from "./prompts/coverLetterContent";
+import { computeAtsScore } from "./ats/computeAtsScore";
 
-const SYSTEM = RESUME_CONTENT_PROMPT;
+const SYSTEM = RESUME_CONTENT_SYSTEM_PROMPT;
 
 function parseAiResponse(text: string): { resumeJson: object | null } {
   let resumeJson: object | null = null;
@@ -43,7 +43,7 @@ ${JSON.stringify(resumeJson, null, 2)}
 
 ${notes ? `ADDITIONAL NOTES:\n${notes}\n` : ''}`;
 
-  const out = await generateAny(provider, { system: COVER_LETTER_PROMPT, user: USER, model });
+  const out = await generateAny(provider, { system: COVER_LETTER_SYSTEM_PROMPT, user: USER, model });
   return {
     coverHtml: out.text,
     usage: out.usage

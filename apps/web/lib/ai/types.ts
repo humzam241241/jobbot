@@ -18,3 +18,11 @@ export interface PromptInput {
 }
 
 export type Provider = 'auto' | 'google' | 'openai' | 'anthropic';
+
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  model: string;
+  provider: string;
+}
