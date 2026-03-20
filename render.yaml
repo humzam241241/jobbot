@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: jobbot-server
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && cd apps/server && pnpm build
+    startCommand: cd apps/server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8787"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: AI_PROVIDER
+        sync: false
+      - key: AI_BASE_URL
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
