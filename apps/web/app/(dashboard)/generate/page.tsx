@@ -1,4 +1,4 @@
-import ResumeGenerator from '@/components/jobbot/ResumeGenerator';
+import { ResumeGenerator } from '@/components/jobbot/ResumeGenerator';
 
 export default function GeneratePage() {
   return (
