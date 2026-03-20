@@ -48,13 +48,16 @@ const nextConfig = {
   },
   outputFileTracingExcludes: {
     '*': [
-      './node_modules/puppeteer/.local-chromium/**',
-      './node_modules/puppeteer-core/.local-chromium/**',
-      './node_modules/puppeteer/**',
-      './node_modules/puppeteer-core/**',
-      './node_modules/chrome-aws-lambda/**',
-      './node_modules/playwright/**',
-      './node_modules/playwright-core/**',
+      'node_modules/puppeteer/**',
+      'node_modules/puppeteer-core/**',
+      'node_modules/chrome-aws-lambda/**',
+      'node_modules/playwright/**',
+      'node_modules/playwright-core/**',
+      'node_modules/.pnpm/puppeteer*/**',
+      'node_modules/.pnpm/chrome-aws-lambda*/**',
+      'node_modules/.pnpm/playwright*/**',
+      'node_modules/**/chromium/**',
+      'node_modules/**/.local-chromium/**',
     ],
   },
   experimental: {
