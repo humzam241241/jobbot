@@ -2,7 +2,7 @@
 import "server-only";
 
 import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import chromium from "@sparticuz/chromium-min";
 import path from "path";
 import fs from "fs/promises";
 import { toHtmlString, HtmlLike } from "./html.server";
@@ -57,7 +57,9 @@ export async function renderToPdf(opts: PdfOptions) {
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
+    executablePath: await chromium.executablePath(
+      'https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar'
+    ),
     headless: chromium.headless,
   });
   try {

@@ -75,7 +75,7 @@ const nextConfig = {
       'chrome-aws-lambda',
       'puppeteer',
       'puppeteer-core',
-      '@sparticuz/chromium',
+      '@sparticuz/chromium-min',
       'html-pdf-node',
       'pdf-parse',
     ],

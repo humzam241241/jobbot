@@ -211,7 +211,7 @@ importers:
       '@prisma/client':
         specifier: ^5.10.0
         version: 5.22.0(prisma@5.22.0)
-      '@sparticuz/chromium':
+      '@sparticuz/chromium-min':
         specifier: ^123.0.1
         version: 123.0.1
       '@types/node':
@@ -1677,8 +1677,8 @@ packages:
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
 
-  '@sparticuz/chromium@123.0.1':
-    resolution: {integrity: sha512-RPrA99xrddbXXZjhUH1WZkTCK3QDQ77t/0y+vULtiW1uAlWLBxorxGnNTuzBDk6eNolxOVFrXZ2aoAN+/eB5TA==}
+  '@sparticuz/chromium-min@123.0.1':
+    resolution: {integrity: sha512-xB0lGecfZQf1rQZi+x0vA97zrrDBH5opgrZIxzI+ITrwXKeJtBOrXMv5L2dEpHDq9bMBXXhdGap0P7iCDSUvPg==}
     engines: {node: '>= 16'}
 
   '@swc/helpers@0.3.17':
@@ -8102,7 +8102,7 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
-  '@sparticuz/chromium@123.0.1':
+  '@sparticuz/chromium-min@123.0.1':
     dependencies:
       follow-redirects: 1.15.11
       tar-fs: 3.1.0
