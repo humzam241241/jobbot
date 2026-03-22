@@ -20,24 +20,8 @@ export async function renderToPdf(opts: PdfOptions) {
   const absOutDir = path.join(projectRoot, outDir);
   await fs.mkdir(absOutDir, { recursive: true });
 
-  // Convert input to HTML string
-  let html: string;
-  
-  // Handle React elements specially with the server renderer (dynamic import to avoid
-  // static tracing of react-dom/server into the serverless function bundle)
-  if (typeof opts.html === 'object' &&
-      opts.html !== null &&
-      (opts.html as any).$$typeof) {
-    try {
-      const { renderReactToHtml } = await import("./server-renderer");
-      html = await Promise.resolve(renderReactToHtml(opts.html));
-    } catch (error) {
-      console.error("Error rendering React to HTML:", error);
-      html = toHtmlString(opts.html);
-    }
-  } else {
-    html = toHtmlString(opts.html);
-  }
+  // Convert input to HTML string (callers must pre-render React elements before passing)
+  const html = toHtmlString(opts.html);
   const pageHtml = `<!doctype html>
 <html>
 <head>
