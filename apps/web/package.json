@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm -s ensure:deps && next dev",
     "prebuild": "node scripts/check-build.js || node scripts/check-build.ts || exit 0",
-    "build": "pnpm -s ensure:deps && next build",
+    "build": "pnpm -s ensure:deps && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "secretlint": "secretlint \"**/*\" -i node_modules -i .next -i .git -i dist -i .env -i .env.local -i *.env",
@@ -51,6 +51,8 @@
     "react-dropzone": "^15.0.0",
     "react-google-drive-picker": "^1.2.2",
     "react-hot-toast": "^2.4.1",
+    "@sparticuz/chromium": "^123.0.1",
+    "puppeteer-core": "^22.0.0",
     "react-icons": "^5.5.0",
     "react-use": "^17.6.0",
     "sanitize-html": "^2.17.2",

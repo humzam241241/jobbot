@@ -211,6 +211,9 @@ importers:
       '@prisma/client':
         specifier: ^5.10.0
         version: 5.22.0(prisma@5.22.0)
+      '@sparticuz/chromium':
+        specifier: ^123.0.1
+        version: 123.0.1
       '@types/node':
         specifier: 20.11.24
         version: 20.11.24
@@ -292,6 +295,9 @@ importers:
       postcss:
         specifier: 8.4.35
         version: 8.4.35
+      puppeteer-core:
+        specifier: ^22.0.0
+        version: 22.15.0
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -1670,6 +1676,10 @@ packages:
 
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
+
+  '@sparticuz/chromium@123.0.1':
+    resolution: {integrity: sha512-RPrA99xrddbXXZjhUH1WZkTCK3QDQ77t/0y+vULtiW1uAlWLBxorxGnNTuzBDk6eNolxOVFrXZ2aoAN+/eB5TA==}
+    engines: {node: '>= 16'}
 
   '@swc/helpers@0.3.17':
     resolution: {integrity: sha512-tb7Iu+oZ+zWJZ3HJqwx8oNwSDIU440hmVMDPhpACWQWnrZHK99Bxs70gT1L2dnr5Hg50ZRWEFkQCAnOVVV0z1Q==}
@@ -8091,6 +8101,14 @@ snapshots:
   '@sinonjs/fake-timers@10.3.0':
     dependencies:
       '@sinonjs/commons': 3.0.1
+
+  '@sparticuz/chromium@123.0.1':
+    dependencies:
+      follow-redirects: 1.15.11
+      tar-fs: 3.1.0
+    transitivePeerDependencies:
+      - bare-buffer
+      - debug
 
   '@swc/helpers@0.3.17':
     dependencies:

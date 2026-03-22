@@ -62,18 +62,19 @@ const nextConfig = {
         'node_modules/.pnpm/html-pdf-node*/**',
       ],
     },
-    serverComponentsExternalPackages: [
-      'canvas',
-      'pdfjs-dist',
-      'jsdom',
-      'playwright',
-      'chrome-aws-lambda',
-      'puppeteer',
-      'puppeteer-core',
-      'html-pdf-node',
-      'pdf-parse',
-    ],
   },
+  serverExternalPackages: [
+    'canvas',
+    'pdfjs-dist',
+    'jsdom',
+    'playwright',
+    'chrome-aws-lambda',
+    'puppeteer',
+    'puppeteer-core',
+    '@sparticuz/chromium',
+    'html-pdf-node',
+    'pdf-parse',
+  ],
 }
 
 export default nextConfig;
