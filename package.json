@@ -1,0 +1,18 @@
+{
+  "private": true,
+  "name": "jobbot-monorepo",
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "build": "pnpm --filter web build",
+    "dev": "pnpm --filter web dev",
+    "postinstall": "echo skip"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "tesseract.js"
+    ]
+  }
+}
