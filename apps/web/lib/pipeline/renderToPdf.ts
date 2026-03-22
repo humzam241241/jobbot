@@ -6,7 +6,6 @@ import chromium from "@sparticuz/chromium-min";
 import path from "path";
 import fs from "fs/promises";
 import { toHtmlString, HtmlLike } from "./html.server";
-import { renderReactToHtml } from "./server-renderer";
 
 type PdfOptions = {
   html: HtmlLike;
@@ -24,12 +23,13 @@ export async function renderToPdf(opts: PdfOptions) {
   // Convert input to HTML string
   let html: string;
   
-  // Handle React elements specially with the server renderer
-  if (typeof opts.html === 'object' && 
-      opts.html !== null && 
+  // Handle React elements specially with the server renderer (dynamic import to avoid
+  // static tracing of react-dom/server into the serverless function bundle)
+  if (typeof opts.html === 'object' &&
+      opts.html !== null &&
       (opts.html as any).$$typeof) {
-    // Use synchronous toHtmlString as a fallback in case renderReactToHtml fails
     try {
+      const { renderReactToHtml } = await import("./server-renderer");
       html = await Promise.resolve(renderReactToHtml(opts.html));
     } catch (error) {
       console.error("Error rendering React to HTML:", error);
