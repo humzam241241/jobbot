@@ -5,7 +5,7 @@ import pdf from 'pdf-parse';
 import fs from 'fs';
 import path from 'path';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 
 const logger = createLogger('resume-processor');
 const openai = new OpenAI({

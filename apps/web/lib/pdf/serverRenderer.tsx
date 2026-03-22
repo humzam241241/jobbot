@@ -1,6 +1,6 @@
 import "server-only";
 import { ReactNode } from "react";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";

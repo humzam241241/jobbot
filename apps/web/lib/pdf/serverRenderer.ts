@@ -3,7 +3,7 @@ import "server-only";
 
 // Import only the type, not the actual implementation
 import type { ReactNode } from 'react';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import path from 'path';
 import fs from 'fs/promises';
 

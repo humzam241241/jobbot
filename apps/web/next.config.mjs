@@ -29,11 +29,13 @@ const nextConfig = {
         'pdf-parse': 'commonjs pdf-parse',
       });
 
-      // These modules are too large for serverless (puppeteer bundles Chromium ~280MB)
-      // They are lazy-imported at runtime only when needed, so resolve to empty stubs
+      // Alias 'puppeteer' -> 'puppeteer-core' so any legacy require('puppeteer') resolves correctly
+      config.resolve.alias['puppeteer'] = 'puppeteer-core';
+
+      // These modules are too large for serverless — keep them external (not bundled)
       config.externals.push(
         function ({ request }, callback) {
-          if (/^(puppeteer|puppeteer-core|chrome-aws-lambda|playwright|html-pdf-node)$/.test(request)) {
+          if (/^(puppeteer-core|@sparticuz\/chromium|chrome-aws-lambda|playwright|html-pdf-node)$/.test(request)) {
             return callback(null, `commonjs ${request}`);
           }
           callback();
@@ -51,10 +53,12 @@ const nextConfig = {
       '*': [
         'node_modules/puppeteer/**',
         'node_modules/puppeteer-core/**',
+        'node_modules/@sparticuz/**',
         'node_modules/chrome-aws-lambda/**',
         'node_modules/playwright/**',
         'node_modules/playwright-core/**',
         'node_modules/.pnpm/puppeteer*/**',
+        'node_modules/.pnpm/@sparticuz*/**',
         'node_modules/.pnpm/chrome-aws-lambda*/**',
         'node_modules/.pnpm/playwright*/**',
         'node_modules/**/chromium/**',
@@ -62,19 +66,19 @@ const nextConfig = {
         'node_modules/.pnpm/html-pdf-node*/**',
       ],
     },
+    serverComponentsExternalPackages: [
+      'canvas',
+      'pdfjs-dist',
+      'jsdom',
+      'playwright',
+      'chrome-aws-lambda',
+      'puppeteer',
+      'puppeteer-core',
+      '@sparticuz/chromium',
+      'html-pdf-node',
+      'pdf-parse',
+    ],
   },
-  serverExternalPackages: [
-    'canvas',
-    'pdfjs-dist',
-    'jsdom',
-    'playwright',
-    'chrome-aws-lambda',
-    'puppeteer',
-    'puppeteer-core',
-    '@sparticuz/chromium',
-    'html-pdf-node',
-    'pdf-parse',
-  ],
 }
 
 export default nextConfig;
