@@ -29,12 +29,13 @@ const nextConfig = {
         'pdf-parse': 'commonjs pdf-parse',
       });
 
-      // Alias 'puppeteer' -> 'puppeteer-core' so any legacy require('puppeteer') resolves correctly
-      config.resolve.alias['puppeteer'] = 'puppeteer-core';
-
-      // These modules are too large for serverless — keep them external (not bundled)
+      // Keep puppeteer/puppeteer-core external (never bundle — ESM uses private class fields
+      // that SWC can't parse). Remap bare 'puppeteer' to 'puppeteer-core' at runtime.
       config.externals.push(
         function ({ request }, callback) {
+          if (request === 'puppeteer') {
+            return callback(null, 'commonjs puppeteer-core');
+          }
           if (/^(puppeteer-core|@sparticuz\/chromium|chrome-aws-lambda|playwright|html-pdf-node)$/.test(request)) {
             return callback(null, `commonjs ${request}`);
           }
